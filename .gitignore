@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Lock files (bun.lock is the primary lockfile)
+package-lock.json
+skills-lock.json
+
+# IDE / editor
+.vscode/
+
+# Claude Code / AI tooling
+.agents/
+.claude/
+.plans/
+.spec/
+CLAUDE.md
+
+# Misc
+*.log
+*.tsbuildinfo
+.eslintcache
+coverage/

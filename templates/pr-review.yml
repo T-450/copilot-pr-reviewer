@@ -1,0 +1,65 @@
+parameters:
+  - name: configPath
+    type: string
+    default: '.prreviewer.yml'
+  - name: maxFiles
+    type: number
+    default: 30
+  - name: severityThreshold
+    type: string
+    default: 'suggestion'
+    values: ['critical', 'warning', 'suggestion', 'nitpick']
+  - name: variableGroup
+    type: string
+    default: 'pr-reviewer-secrets'
+
+jobs:
+  - job: AICodeReview
+    displayName: 'AI Code Review'
+    pool:
+      vmImage: 'ubuntu-latest'
+    condition: eq(variables['Build.Reason'], 'PullRequest')
+    continueOnError: true
+    variables:
+      - group: ${{ parameters.variableGroup }}
+    steps:
+      - script: |
+          curl -fsSL https://bun.sh/install | bash
+          echo "##vso[task.prependpath]$HOME/.bun/bin"
+        displayName: 'Install Bun'
+
+      - script: |
+          npm install -g @github/copilot
+        displayName: 'Install Copilot CLI'
+
+      - checkout: pr-reviewer
+        path: pr-reviewer
+
+      - checkout: self
+        path: source-repo
+        fetchDepth: 0
+
+      - script: |
+          cd $(Pipeline.Workspace)/pr-reviewer
+          bun install --frozen-lockfile --linker isolated
+        displayName: 'Install dependencies'
+
+      - script: |
+          cd $(Pipeline.Workspace)/pr-reviewer
+          bun run src/index.ts || true
+        displayName: 'Run AI Code Review'
+        env:
+          ADO_PAT: $(ADO_PAT)
+          ADO_ORG: $(System.CollectionUri)
+          ADO_PROJECT: $(System.TeamProject)
+          ADO_REPO_ID: $(Build.Repository.ID)
+          ADO_PR_ID: $(System.PullRequest.PullRequestId)
+          REPO_ROOT: $(Pipeline.Workspace)/source-repo
+          CONFIG_PATH: ${{ parameters.configPath }}
+          MAX_FILES: ${{ parameters.maxFiles }}
+          SEVERITY_THRESHOLD: ${{ parameters.severityThreshold }}
+          COPILOT_GITHUB_TOKEN: $(COPILOT_GITHUB_TOKEN)
+          OTEL_SERVICE_NAME: copilot-pr-reviewer
+          OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=ci,service.namespace=engineering-productivity
+          OTEL_EXPORTER_OTLP_ENDPOINT: $(OTEL_EXPORTER_OTLP_ENDPOINT)
+          OTEL_EXPORTER_OTLP_HEADERS: $(OTEL_EXPORTER_OTLP_HEADERS)
