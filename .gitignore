@@ -21,7 +21,6 @@ skills-lock.json
 .claude/
 .plans/
 .spec/
-CLAUDE.md
 
 # Misc
 *.log
