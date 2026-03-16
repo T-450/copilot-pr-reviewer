@@ -1,6 +1,7 @@
 import { context, trace, type Tracer } from "@opentelemetry/api";
 import type { AdoClient, AdoThread } from "../ado/types";
 import type { ChangedFile, Finding, PrMetadata, ReviewConfig, RiskLevel, Severity, SecurityOverride, TestStatus } from "../shared/types";
+import { SEVERITY_VALUES } from "../shared/types";
 import type { PublishResult } from "../ado/reconcile-publish";
 
 
@@ -93,7 +94,11 @@ export async function runReview(deps: ReviewDeps = defaultDeps): Promise<void> {
       ...(Number.isInteger(maxFilesEnv) && maxFilesEnv > 0 ? { maxFiles: maxFilesEnv } : {}),
     };
     configSpan.end();
-    const severityThreshold = (process.env.SEVERITY_THRESHOLD as Severity) ?? config.severityThreshold;
+    const envSeverity = process.env.SEVERITY_THRESHOLD;
+    const severityThreshold: Severity =
+      envSeverity && (SEVERITY_VALUES as readonly string[]).includes(envSeverity)
+        ? (envSeverity as Severity)
+        : config.severityThreshold;
     deps.events.configLoaded({ config_path: configPath });
 
     const client = deps.createAdoClient(`https://dev.azure.com/${org}`, project, repoId, pat);

@@ -1,6 +1,7 @@
 export type RiskLevel = "HIGH_RISK" | "DATA_RISK" | "MEDIUM_RISK" | "NORMAL";
 export type TestStatus = "changed" | "missing" | "not_changed" | "not_applicable";
-export type Severity = "critical" | "warning" | "suggestion" | "nitpick";
+export const SEVERITY_VALUES = ["critical", "warning", "suggestion", "nitpick"] as const;
+export type Severity = (typeof SEVERITY_VALUES)[number];
 export type Category = "correctness" | "security" | "reliability" | "maintainability" | "testing";
 export type Confidence = "high" | "medium" | "low";
 
