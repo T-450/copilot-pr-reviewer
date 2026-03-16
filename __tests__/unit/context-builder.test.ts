@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   classifyRisk,
   detectTestStatus,
@@ -42,6 +45,28 @@ describe('detectTestStatus', () => {
   });
   it('returns not_applicable for non-source files', () => {
     expect(detectTestStatus('README.md', [])).toBe('not_applicable');
+  });
+  it('returns missing when repoRoot provided and no companion test on disk', () => {
+    // Use a temp directory that contains the source file but no test companion
+    const root = mkdtempSync(join(tmpdir(), 'copilot-test-'));
+    try {
+      mkdirSync(join(root, 'src/auth'), { recursive: true });
+      expect(detectTestStatus('src/auth/service.ts', [], root)).toBe('missing');
+    } finally {
+      rmSync(root, { recursive: true });
+    }
+  });
+  it('returns not_changed when repoRoot provided and companion test exists on disk', () => {
+    const root = mkdtempSync(join(tmpdir(), 'copilot-test-'));
+    try {
+      mkdirSync(join(root, 'src/auth'), { recursive: true });
+      writeFileSync(join(root, 'src/auth/service.test.ts'), '');
+      expect(detectTestStatus('src/auth/service.ts', [], root)).toBe(
+        'not_changed',
+      );
+    } finally {
+      rmSync(root, { recursive: true });
+    }
   });
 });
 

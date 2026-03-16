@@ -53,7 +53,7 @@ export async function runReview(): Promise<void> {
     const allChangedPaths = allFilesPartial.map((f) => f.path);
     const allFiles = allFilesPartial.map((f) => ({
       ...f,
-      testStatus: detectTestStatus(f.path, allChangedPaths),
+      testStatus: detectTestStatus(f.path, allChangedPaths, env.repoRoot),
     }));
 
     const files = allFiles.slice(0, effectiveMaxFiles);

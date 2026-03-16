@@ -4,6 +4,7 @@ import type {
   RiskLevel,
   TestStatus,
 } from '../types.js';
+import { existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { join, dirname, basename, extname } from 'node:path';
 import { minimatch } from 'minimatch';
@@ -60,6 +61,7 @@ export function classifyRisk(
 export function detectTestStatus(
   filePath: string,
   allChangedPaths: string[],
+  repoRoot?: string,
 ): TestStatus {
   const ext = extname(filePath);
   if (/\.(test|spec|tests)\./i.test(filePath)) return 'not_applicable';
@@ -78,7 +80,16 @@ export function detectTestStatus(
   const hasChangedTest = candidates.some((c) =>
     allChangedPaths.some((p) => p.endsWith(c) || p === c),
   );
-  return hasChangedTest ? 'changed' : 'not_changed';
+  if (hasChangedTest) return 'changed';
+
+  // If repoRoot is provided, check whether any companion test file exists on disk.
+  // If none exists, flag as missing rather than merely not_changed.
+  if (repoRoot) {
+    const testExists = candidates.some((c) => existsSync(join(repoRoot, c)));
+    if (!testExists) return 'missing';
+  }
+
+  return 'not_changed';
 }
 
 export async function buildRepoMap(
