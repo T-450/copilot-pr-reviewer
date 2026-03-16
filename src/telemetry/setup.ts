@@ -9,7 +9,7 @@ let sdk: NodeSDK | null = null;
 
 export const reviewRunId = randomUUID();
 
-export function initTelemetry(): void {
+export async function initTelemetry(): Promise<void> {
   const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   if (!endpoint) {
     console.log('OTEL_EXPORTER_OTLP_ENDPOINT not set — telemetry disabled');
@@ -22,7 +22,7 @@ export function initTelemetry(): void {
       exportIntervalMillis: 30_000,
     }),
   });
-  sdk.start();
+  await sdk.start();
 }
 
 export async function shutdownTelemetry(): Promise<void> {

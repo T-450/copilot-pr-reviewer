@@ -10,6 +10,7 @@ import { fetchPRMetadata } from '../ado/pr-metadata.js';
 import { fetchIncrementalChanges } from '../ado/iteration-diff.js';
 import { listBotThreads } from '../ado/comment-poster.js';
 import { reconcileAndPublish } from '../ado/thread-reconciler.js';
+import { detectTestStatus } from '../repo/context-builder.js';
 import { reviewFiles } from '../copilot/review-session.js';
 import { initTelemetry, shutdownTelemetry } from '../telemetry/setup.js';
 import {
@@ -32,7 +33,7 @@ function filterBySeverity(
 }
 
 export async function runReview(): Promise<void> {
-  initTelemetry();
+  await initTelemetry();
   const startTime = Date.now();
   const env = loadEnv();
   emitRunStarted(env);
@@ -42,11 +43,18 @@ export async function runReview(): Promise<void> {
     const config = await loadConfig(env.configPath, env.repoRoot);
     const effectiveMaxFiles = Math.min(config.maxFiles, env.maxFiles);
 
-    const [prMeta, allFiles, existingThreads] = await Promise.all([
+    const [prMeta, allFilesPartial, existingThreads] = await Promise.all([
       fetchPRMetadata(client, env),
       fetchIncrementalChanges(client, env, config, []),
       listBotThreads(client, env),
     ]);
+
+    // Second pass: recompute testStatus now that we have the full list of changed paths
+    const allChangedPaths = allFilesPartial.map((f) => f.path);
+    const allFiles = allFilesPartial.map((f) => ({
+      ...f,
+      testStatus: detectTestStatus(f.path, allChangedPaths),
+    }));
 
     const files = allFiles.slice(0, effectiveMaxFiles);
     if (allFiles.length > effectiveMaxFiles) {

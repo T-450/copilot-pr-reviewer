@@ -122,6 +122,20 @@ export function loadEnv(): Env {
     if (!v) throw new Error(`Missing env: ${key}`);
     return v;
   };
+  const maxFilesRaw = Number(process.env.MAX_FILES ?? '30');
+  if (!Number.isFinite(maxFilesRaw) || maxFilesRaw < 1) {
+    throw new Error(
+      `Invalid MAX_FILES: "${process.env.MAX_FILES}" — must be a positive integer`,
+    );
+  }
+
+  const severityRaw = process.env.SEVERITY_THRESHOLD ?? 'suggestion';
+  if (!Severity.includes(severityRaw as Severity)) {
+    throw new Error(
+      `Invalid SEVERITY_THRESHOLD: "${severityRaw}" — must be one of: ${Severity.join(', ')}`,
+    );
+  }
+
   return {
     adoPat: required('ADO_PAT'),
     adoOrg: required('ADO_ORG').replace(/\/$/, ''),
@@ -130,8 +144,7 @@ export function loadEnv(): Env {
     adoPrId: required('ADO_PR_ID'),
     repoRoot: required('REPO_ROOT'),
     configPath: process.env.CONFIG_PATH ?? '.prreviewer.yml',
-    maxFiles: Number(process.env.MAX_FILES ?? '30'),
-    severityThreshold:
-      (process.env.SEVERITY_THRESHOLD as Severity) ?? 'suggestion',
+    maxFiles: maxFilesRaw,
+    severityThreshold: severityRaw as Severity,
   };
 }

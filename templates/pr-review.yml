@@ -20,6 +20,7 @@ parameters:
 jobs:
   - job: CopilotPRReview
     displayName: 'AI Code Review'
+    condition: eq(variables['Build.Reason'], 'PullRequest')
     pool:
       vmImage: 'ubuntu-latest'
     variables:

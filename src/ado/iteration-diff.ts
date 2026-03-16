@@ -1,9 +1,10 @@
+import { resolve, normalize } from 'node:path';
 import { minimatch } from 'minimatch';
 import type { AdoClient } from './client.js';
 import type { Env, ChangedFile, ReviewConfig } from '../types.js';
 import { classifyRisk, detectTestStatus } from '../repo/context-builder.js';
 
-const BINARY_EXTENSIONS = new Set([
+const BINARY_EXTENSIONS = [
   '.png',
   '.jpg',
   '.jpeg',
@@ -21,10 +22,10 @@ const BINARY_EXTENSIONS = new Set([
   '.tar.gz',
   '.wasm',
   '.map',
-]);
+];
 
 function isBinary(filePath: string): boolean {
-  return BINARY_EXTENSIONS.has(filePath.slice(filePath.lastIndexOf('.')));
+  return BINARY_EXTENSIONS.some((ext) => filePath.endsWith(ext));
 }
 
 export async function fetchIncrementalChanges(
@@ -63,12 +64,19 @@ export async function fetchIncrementalChanges(
 
     const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
 
+    // Reject path traversal attempts — resolved path must stay within repoRoot
+    const absolutePath = resolve(env.repoRoot, normalizedPath);
+    if (!absolutePath.startsWith(normalize(env.repoRoot) + '/')) {
+      console.warn(`Skipping path outside repo root: ${path}`);
+      continue;
+    }
+
     if (config.ignore.some((pattern) => minimatch(normalizedPath, pattern)))
       continue;
 
     files.push({
       path: normalizedPath,
-      absolutePath: `${env.repoRoot}/${normalizedPath}`,
+      absolutePath,
       diff: '', // populated later via git diff
       changeType: changeType === 1 ? 'add' : 'edit',
       changeTrackingId: (entry.changeTrackingId as number) ?? 0,
