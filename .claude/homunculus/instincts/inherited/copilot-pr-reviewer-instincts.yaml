@@ -1,0 +1,235 @@
+# Instincts generated from https://github.com/T-450/copilot-pr-reviewer
+# Generated: 2026-03-16T21:12:02.949Z
+# Version: 2.0
+
+---
+id: copilot-pr-reviewer-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/T-450/copilot-pr-reviewer
+---
+
+# Copilot Pr Reviewer Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat, ci, chore
+
+## Evidence
+
+- 5 commits analyzed
+- Detected conventional commit pattern
+- Examples: ci: add GitHub Actions workflow with build and test steps, feat: rebuild project from node-typescript-boilerplate with Node.js 22 + Vitest
+
+---
+id: copilot-pr-reviewer-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/T-450/copilot-pr-reviewer
+---
+
+# Copilot Pr Reviewer Commit Length
+
+## Action
+
+Write moderate-length commit messages (~50 characters)
+
+## Evidence
+
+- Average commit message length: 60 chars
+- Based on 5 commits
+
+---
+id: copilot-pr-reviewer-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/T-450/copilot-pr-reviewer
+---
+
+# Copilot Pr Reviewer Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: copilot-pr-reviewer-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/T-450/copilot-pr-reviewer
+---
+
+# Copilot Pr Reviewer Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: copilot-pr-reviewer-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/T-450/copilot-pr-reviewer
+---
+
+# Copilot Pr Reviewer Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: copilot-pr-reviewer-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/T-450/copilot-pr-reviewer
+---
+
+# Copilot Pr Reviewer Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: copilot-pr-reviewer-test-framework
+trigger: "when writing tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/T-450/copilot-pr-reviewer
+---
+
+# Copilot Pr Reviewer Test Framework
+
+## Action
+
+Use vitest as the test framework
+
+## Evidence
+
+- Test framework detected: vitest
+- File pattern: *.test.ts
+
+---
+id: copilot-pr-reviewer-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/T-450/copilot-pr-reviewer
+---
+
+# Copilot Pr Reviewer Test Naming
+
+## Action
+
+Name test files using the pattern: *.test.ts
+
+## Evidence
+
+- File pattern: *.test.ts
+- Consistent across test files
+
+---
+id: copilot-pr-reviewer-test-types
+trigger: "when planning tests for a feature"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/T-450/copilot-pr-reviewer
+---
+
+# Copilot Pr Reviewer Test Types
+
+## Action
+
+Write unit, integration tests to match project standards
+
+## Evidence
+
+- Test types detected: unit, integration
+- Coverage config: yes
+
+---
+id: copilot-pr-reviewer-workflow-add-or-update-project-documentation
+trigger: "when doing add or update project documentation"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/T-450/copilot-pr-reviewer
+---
+
+# Copilot Pr Reviewer Workflow Add Or Update Project Documentation
+
+## Action
+
+Follow the add-or-update-project-documentation workflow:
+1. Create or update documentation file (e.g. README.md, CLAUDE.md)
+2. Optionally update .gitignore or package.json to reflect new docs or project name
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: README.md, CLAUDE.md, .gitignore
+
+---
+id: copilot-pr-reviewer-workflow-project-scaffolding-or-rebuild
+trigger: "when doing project scaffolding or rebuild"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/T-450/copilot-pr-reviewer
+---
+
+# Copilot Pr Reviewer Workflow Project Scaffolding Or Rebuild
+
+## Action
+
+Follow the project-scaffolding-or-rebuild workflow:
+1. Add or replace configuration files (.editorconfig, .gitignore, tsconfig.json, etc.)
+2. Add or replace package manager and tool configs (package.json, bun.lock, bunfig.toml, etc.)
+3. Add or replace source files under src/
+4. Add or replace test files under __tests__/ or src/
+5. Add or replace documentation (README.md, CLAUDE.md, templates/)
+6. Add or update CI/CD workflow files
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: .editorconfig, .gitignore, README.md
+
