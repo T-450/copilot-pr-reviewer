@@ -1,4 +1,4 @@
-# volvo-pr-reviewer
+# copilot-pr-reviewer
 
 AI code reviewer for Azure DevOps pull requests. Runs as a pipeline task using the GitHub Copilot SDK and Bun.js. Zero hosting cost -- executes on Microsoft-hosted Ubuntu agents during PR build validation.
 
@@ -72,7 +72,7 @@ In Azure DevOps, create a variable group named `pr-reviewer-secrets` with:
 
 ### 2. Push this repo to Azure DevOps
 
-Push `volvo-pr-reviewer` to an Azure DevOps Git repository (e.g. `YourProject/copilot-pr-reviewer`).
+Push `copilot-pr-reviewer` to an Azure DevOps Git repository (e.g. `YourProject/copilot-pr-reviewer`).
 
 ### 3. Add the pipeline to consuming repos
 
