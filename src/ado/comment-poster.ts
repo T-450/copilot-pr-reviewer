@@ -1,42 +1,34 @@
-import type { AdoClient, AdoThread } from "./types";
-import type { Finding, ChangedFile } from "../shared/types";
+import type { AdoClient } from './client.js';
+import type { Env, Finding, ChangedFile } from '../types.js';
 
-export const BOT_MARKER = "<!-- copilot-pr-reviewer-bot -->";
-
+const BOT_MARKER = '<!-- copilot-pr-reviewer-bot -->';
 const SEVERITY_ICONS: Record<string, string> = {
-  critical: "🔴",
-  warning: "🟡",
-  suggestion: "🔵",
-  nitpick: "⚪",
+  critical: '🔴',
+  warning: '🟡',
+  suggestion: '🔵',
+  nitpick: '⚪',
 };
-
-export function severityIcon(severity: string): string {
-  return SEVERITY_ICONS[severity] ?? "⚪";
-}
-
-export function formatThreadContent(finding: Finding): string {
-  const lines = [
-    BOT_MARKER,
-    `<!-- fingerprint:${finding.fingerprint} -->`,
-    `### ${severityIcon(finding.severity)} ${finding.title}`,
-    "",
-    finding.message,
-  ];
-  if (finding.suggestion) {
-    lines.push("", "**Suggestion:**", finding.suggestion);
-  }
-  lines.push("", `_Severity: ${finding.severity} | Category: ${finding.category} | Confidence: ${finding.confidence}_`);
-  return lines.join("\n");
-}
 
 export async function createThread(
   client: AdoClient,
-  prId: string,
+  env: Env,
   finding: Finding,
   file: ChangedFile,
-): Promise<void> {
+): Promise<number> {
+  const content = [
+    `${SEVERITY_ICONS[finding.severity]} **${finding.severity.toUpperCase()}** — ${finding.title}`,
+    '',
+    finding.message,
+    finding.suggestion
+      ? `\n**Suggested fix:**\n\n\`\`\`suggestion\n${finding.suggestion}\n\`\`\``
+      : '',
+    '',
+    BOT_MARKER,
+    `<!-- fingerprint:${finding.fingerprint} -->`,
+  ].join('\n');
+
   const body = {
-    comments: [{ parentCommentId: 0, content: formatThreadContent(finding), commentType: 1 }],
+    comments: [{ parentCommentId: 0, content, commentType: 1 }],
     threadContext: {
       filePath: `/${finding.filePath}`,
       rightFileStart: { line: finding.startLine, offset: 1 },
@@ -49,24 +41,63 @@ export async function createThread(
         secondComparingIteration: file.currentIteration,
       },
     },
-    status: 1, // active
+    status: 1,
   };
-  await client.post(`/pullRequests/${prId}/threads`, body);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await client.request<any>(
+    `/pullRequests/${env.adoPrId}/threads?api-version=7.1`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+  return result.id as number;
 }
 
-export async function listBotThreads(client: AdoClient, prId: string): Promise<AdoThread[]> {
-  const response = await client.get<{ value: AdoThread[] }>(`/pullRequests/${prId}/threads`);
-  return response.value.filter((thread) =>
-    thread.comments.some((c) => c.content.includes(BOT_MARKER))
+export async function resolveThread(
+  client: AdoClient,
+  env: Env,
+  threadId: number,
+): Promise<void> {
+  await client.request(
+    `/pullRequests/${env.adoPrId}/threads/${threadId}?api-version=7.1`,
+    { method: 'PATCH', body: JSON.stringify({ status: 4 }) },
   );
 }
 
-export async function updateThreadStatus(
+export type ExistingBotThread = {
+  id: number;
+  filePath: string;
+  fingerprint: string | null;
+  changeTrackingId: number | null;
+  status: number;
+};
+
+export async function listBotThreads(
   client: AdoClient,
-  prId: string,
-  threadId: number,
-  status: "fixed" | "closed",
-): Promise<void> {
-  const statusMap = { fixed: 4, closed: 5 };
-  await client.patch(`/pullRequests/${prId}/threads/${threadId}`, { status: statusMap[status] });
+  env: Env,
+): Promise<ExistingBotThread[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await client.request<any>(
+    `/pullRequests/${env.adoPrId}/threads?api-version=7.1`,
+  );
+  const threads: ExistingBotThread[] = [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const t of (result.value as any[]) ?? []) {
+    const firstComment = (t.comments?.[0]?.content as string) ?? '';
+    if (!firstComment.includes(BOT_MARKER)) continue;
+
+    const fpMatch = firstComment.match(
+      /<!-- fingerprint:(sha256:[a-f0-9]+) -->/,
+    );
+    threads.push({
+      id: t.id as number,
+      filePath:
+        ((t.threadContext?.filePath as string) ?? '').replace(/^\//, ''),
+      fingerprint: fpMatch?.[1] ?? null,
+      changeTrackingId:
+        (t.pullRequestThreadContext?.changeTrackingId as number) ?? null,
+      status: t.status as number,
+    });
+  }
+  return threads;
 }

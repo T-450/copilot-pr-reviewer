@@ -1,181 +1,109 @@
-import { context, trace, type Tracer } from "@opentelemetry/api";
-import type { AdoClient, AdoThread } from "../ado/types";
-import type { ChangedFile, Finding, PrMetadata, ReviewConfig, RiskLevel, Severity, SecurityOverride, TestStatus } from "../shared/types";
-import type { PublishResult } from "../ado/reconcile-publish";
+import {
+  loadEnv,
+  type Severity,
+  type Finding,
+  Severity as SeverityValues,
+} from '../types.js';
+import { createAdoClient } from '../ado/client.js';
+import { loadConfig } from '../config/load-config.js';
+import { fetchPRMetadata } from '../ado/pr-metadata.js';
+import { fetchIncrementalChanges } from '../ado/iteration-diff.js';
+import { listBotThreads } from '../ado/comment-poster.js';
+import { reconcileAndPublish } from '../ado/thread-reconciler.js';
+import { reviewFiles } from '../copilot/review-session.js';
+import { initTelemetry, shutdownTelemetry } from '../telemetry/setup.js';
+import {
+  emitRunStarted,
+  emitRunCompleted,
+  emitRunFailed,
+  emitFindingEmitted,
+} from '../telemetry/events.js';
 
+function severityIndex(s: Severity): number {
+  return SeverityValues.indexOf(s);
+}
 
-import { initTelemetry, getTracer } from "../telemetry/instrumentation";
-import { reviewMetrics } from "../telemetry/metrics";
-import { events } from "../telemetry/events";
-import { loadConfig } from "../config/load-config";
-import { createAdoClient } from "../ado/client";
-import { fetchPRMetadata } from "../ado/pr-metadata";
-import { fetchIncrementalChanges } from "../ado/iteration-diff";
-import { listBotThreads } from "../ado/comment-poster";
-import { classifyRisk } from "../repo/security-tagger";
-import { detectTestCompanion } from "../repo/test-companion";
-import { generateRepoMap } from "../repo/repo-map";
-import { reviewFiles } from "../copilot/review-session";
-import { filterBySeverity } from "./severity-filter";
-import { filterFiles } from "./file-filter";
-import { reconcileAndPublish } from "../ado/reconcile-publish";
-import { populateDiffs } from "../ado/diff-fetcher";
-import { AuthError, logPipelineWarning } from "../shared/errors";
+function filterBySeverity(
+  findings: Finding[],
+  threshold: Severity,
+): Finding[] {
+  const minIndex = severityIndex(threshold);
+  return findings.filter((f) => severityIndex(f.severity) <= minIndex);
+}
 
-export type ReviewDeps = {
-  initTelemetry: () => Promise<() => Promise<void>>;
-  getTracer: (name?: string) => Tracer;
-  loadConfig: (configPath: string) => Promise<ReviewConfig>;
-  createAdoClient: (orgUrl: string, project: string, repoId: string, pat: string) => AdoClient;
-  fetchIncrementalChanges: (client: AdoClient, prId: string, repoRoot: string) => Promise<ChangedFile[]>;
-  fetchPRMetadata: (client: AdoClient, prId: string) => Promise<PrMetadata>;
-  listBotThreads: (client: AdoClient, prId: string) => Promise<AdoThread[]>;
-  classifyRisk: (filePath: string, overrides?: SecurityOverride[]) => RiskLevel;
-  detectTestCompanion: (filePath: string, changedPaths: string[], repoRoot: string) => Promise<TestStatus>;
-  filterFiles: (files: ChangedFile[], config: ReviewConfig) => { included: ChangedFile[]; skipped: ChangedFile[] };
-  generateRepoMap: (repoRoot: string) => Promise<string>;
-  reviewFiles: (files: ChangedFile[], prMeta: PrMetadata, config: ReviewConfig, repoMap: string) => Promise<Finding[]>;
-  filterBySeverity: (findings: Finding[], threshold: Severity) => Finding[];
-  reconcileAndPublish: (client: AdoClient, prId: string, existingThreads: AdoThread[], findings: Finding[], files: ChangedFile[]) => Promise<PublishResult>;
-  populateDiffs: (files: ChangedFile[], repoRoot: string, targetBranch: string) => Promise<ChangedFile[]>;
-  reviewMetrics: typeof reviewMetrics;
-  events: typeof events;
-  logPipelineWarning: (message: string) => void;
-};
-
-const defaultDeps: ReviewDeps = {
-  initTelemetry,
-  getTracer,
-  loadConfig,
-  createAdoClient,
-  fetchIncrementalChanges,
-  fetchPRMetadata,
-  listBotThreads,
-  classifyRisk,
-  detectTestCompanion,
-  filterFiles,
-  generateRepoMap,
-  reviewFiles,
-  filterBySeverity,
-  reconcileAndPublish,
-  populateDiffs,
-  reviewMetrics,
-  events,
-  logPipelineWarning,
-};
-
-export async function runReview(deps: ReviewDeps = defaultDeps): Promise<void> {
-  const shutdown = await deps.initTelemetry();
-  const tracer = deps.getTracer();
-
-  const span = tracer.startSpan("review.run");
-  const ctx = trace.setSpan(context.active(), span);
+export async function runReview(): Promise<void> {
+  initTelemetry();
   const startTime = Date.now();
+  const env = loadEnv();
+  emitRunStarted(env);
 
   try {
-    const runId = crypto.randomUUID();
-    span.setAttribute("review.run_id", runId);
-    deps.events.reviewStarted({ review_run_id: runId });
+    const client = createAdoClient(env);
+    const config = await loadConfig(env.configPath, env.repoRoot);
+    const effectiveMaxFiles = Math.min(config.maxFiles, env.maxFiles);
 
-    const pat = process.env.ADO_PAT!;
-    const org = process.env.ADO_ORG!;
-    const project = process.env.ADO_PROJECT!;
-    const repoId = process.env.ADO_REPO_ID!;
-    const prId = process.env.ADO_PR_ID!;
-    const repoRoot = process.env.REPO_ROOT ?? process.cwd();
-    const configPath = process.env.CONFIG_PATH ?? ".prreviewer.yml";
-
-    const configSpan = tracer.startSpan("load reviewer_config", undefined, ctx);
-    const baseConfig = await deps.loadConfig(configPath);
-    const maxFilesEnv = process.env.MAX_FILES ? parseInt(process.env.MAX_FILES, 10) : NaN;
-    const config: ReviewConfig = {
-      ...baseConfig,
-      ...(Number.isInteger(maxFilesEnv) && maxFilesEnv > 0 ? { maxFiles: maxFilesEnv } : {}),
-    };
-    configSpan.end();
-    const severityThreshold = (process.env.SEVERITY_THRESHOLD as Severity) ?? config.severityThreshold;
-    deps.events.configLoaded({ config_path: configPath });
-
-    const client = deps.createAdoClient(`https://dev.azure.com/${org}`, project, repoId, pat);
-
-    const fetchSpan = tracer.startSpan("fetch pull_request", undefined, ctx);
-    const [rawFiles, prMeta, existingThreads] = await Promise.all([
-      deps.fetchIncrementalChanges(client, prId, repoRoot),
-      deps.fetchPRMetadata(client, prId),
-      deps.listBotThreads(client, prId),
+    const [prMeta, allFiles, existingThreads] = await Promise.all([
+      fetchPRMetadata(client, env),
+      fetchIncrementalChanges(client, env, config, []),
+      listBotThreads(client, env),
     ]);
-    fetchSpan.end();
 
-    if (rawFiles.length === 0) {
-      deps.events.reviewCompleted({ review_run_id: runId, files: 0, findings: 0 });
+    const files = allFiles.slice(0, effectiveMaxFiles);
+    if (allFiles.length > effectiveMaxFiles) {
+      console.warn(
+        `Capped review to ${effectiveMaxFiles} files (${allFiles.length} changed)`,
+      );
+    }
+
+    if (files.length === 0) {
+      console.log('No reviewable files — exiting silently.');
       return;
     }
 
-    const filesWithDiffs = await deps.populateDiffs(rawFiles, repoRoot, prMeta.targetBranch);
+    const findings = await reviewFiles(files, prMeta, config);
+    const filtered = filterBySeverity(findings, env.severityThreshold);
 
-    const changedPaths = filesWithDiffs.map((f) => f.path);
-    const enrichedFiles = await Promise.all(
-      filesWithDiffs.map(async (file) => ({
-        ...file,
-        riskLevel: deps.classifyRisk(file.path, config.securityOverrides),
-        testStatus: await deps.detectTestCompanion(file.path, changedPaths, repoRoot),
-      })),
+    const fileByPath = new Map(files.map((f) => [f.path, f]));
+    for (const f of filtered) {
+      emitFindingEmitted({
+        filePath: f.filePath,
+        severity: f.severity,
+        category: f.category,
+        fingerprint: f.fingerprint,
+        riskLevel: fileByPath.get(f.filePath)?.riskLevel ?? 'NORMAL',
+        hasSuggestion: !!f.suggestion,
+      });
+    }
+
+    const stats = await reconcileAndPublish(
+      client,
+      env,
+      existingThreads,
+      filtered,
+      files,
     );
 
-    const { included, skipped } = deps.filterFiles(enrichedFiles, config);
-    deps.events.filesFiltered({ included: included.length, skipped: skipped.length });
-    deps.reviewMetrics.files.add(included.length);
-
-    const contextSpan = tracer.startSpan("build review_context", undefined, ctx);
-    const repoMap = await deps.generateRepoMap(repoRoot);
-    contextSpan.end();
-
-    const llmSpan = tracer.startSpan("call llm", undefined, ctx);
-    const allFindings = await deps.reviewFiles(included, prMeta, config, repoMap);
-    const findings = deps.filterBySeverity(allFindings, severityThreshold);
-    llmSpan.end();
-
-    deps.reviewMetrics.findings.add(findings.length);
-    deps.reviewMetrics.findingsPerRun.record(findings.length);
-    deps.reviewMetrics.filesPerRun.record(included.length);
-
-    const reconcileSpan = tracer.startSpan("reconcile bot_threads", undefined, ctx);
-    const result = await deps.reconcileAndPublish(client, prId, existingThreads, findings, included);
-    reconcileSpan.end();
-
-    deps.reviewMetrics.threadActions.add(result.created, { action: "create" });
-    deps.reviewMetrics.threadActions.add(result.resolved, { action: "resolve" });
-    deps.reviewMetrics.threadActions.add(result.skipped, { action: "skip" });
-
-    span.setAttribute("review.run.mode", "incremental");
-    span.setAttribute("review.files.changed_count", rawFiles.length);
-    span.setAttribute("review.files.reviewed_count", included.length);
-    span.setAttribute("review.findings.count", findings.length);
-    span.setAttribute("review.config.severity_threshold", severityThreshold);
-
-    deps.events.reviewCompleted({
-      review_run_id: runId,
-      files: included.length,
-      findings: findings.length,
-      created: result.created,
-      resolved: result.resolved,
-      skipped: result.skipped,
+    emitRunCompleted({
+      filesChanged: allFiles.length,
+      filesReviewed: files.length,
+      findingsCount: filtered.length,
+      threadsCreated: stats.created,
+      threadsResolved: stats.resolved,
+      threadsDeduped: stats.deduped,
+      durationMs: Date.now() - startTime,
     });
+
+    console.log(
+      `Review complete: ${filtered.length} findings, ${stats.created} posted, ${stats.resolved} resolved, ${stats.deduped} deduped`,
+    );
   } catch (err) {
-    if (err instanceof AuthError) {
-      deps.logPipelineWarning(`Authentication failed (${err.tokenType}): ${err.message}`);
-      deps.events.authFailed({ token_type: err.tokenType });
-    } else {
-      const message = err instanceof Error ? err.message : String(err);
-      deps.logPipelineWarning(`Review failed: ${message}`);
-      deps.events.reviewFailed({ error: message });
-      deps.reviewMetrics.errors.add(1);
-    }
+    const errorType =
+      err instanceof Error && err.message.includes('401')
+        ? 'auth_failed'
+        : 'unknown';
+    emitRunFailed(errorType);
+    throw err;
   } finally {
-    const duration = Date.now() - startTime;
-    deps.reviewMetrics.reviewDuration.record(duration);
-    deps.reviewMetrics.runs.add(1);
-    span.end();
-    await shutdown();
+    await shutdownTelemetry();
   }
 }

@@ -1,29 +1,29 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
 # Dependencies
 node_modules/
 
-# Build output
-dist/
+# Coverage
+coverage
 
-# Environment variables
-.env
-.env.*
-!.env.example
+# Transpiled files
+build/
 
-# Lock files (bun.lock is the primary lockfile)
-package-lock.json
-skills-lock.json
+# VS Code
+.vscode
+!.vscode/tasks.js
 
-# IDE / editor
-.vscode/
+# JetBrains IDEs
+.idea/
 
-# Claude Code / AI tooling
-.agents/
-.claude/
-.plans/
-.spec/
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
 
 # Misc
-*.log
-*.tsbuildinfo
-.eslintcache
-coverage/
+.DS_Store

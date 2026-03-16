@@ -1,63 +1,35 @@
-import { parse } from "yaml";
-import { z } from "zod";
-import type { ReviewConfig } from "../shared/types";
+import { readFile, access } from 'node:fs/promises';
+import { parse } from 'yaml';
+import { ConfigSchema, type ReviewConfig } from '../types.js';
 
-const DEFAULT_CONFIG: ReviewConfig = {
-  ignore: [],
-  severityThreshold: "suggestion",
-  maxFiles: 30,
-  securityOverrides: [],
-};
-
-const ConfigSchema = z
-  .object({
-    ignore: z.array(z.string()).default([]),
-    severityThreshold: z
-      .enum(["critical", "warning", "suggestion", "nitpick"])
-      .default("suggestion"),
-    maxFiles: z.number().int().positive().default(30),
-    securityOverrides: z
-      .array(
-        z.object({
-          path: z.string(),
-          risk: z.enum(["HIGH_RISK", "DATA_RISK", "MEDIUM_RISK", "NORMAL"]),
-        })
-      )
-      .default([]),
-  })
-  .passthrough();
-
-export async function loadConfig(configPath: string): Promise<ReviewConfig> {
-  let raw: string;
+export async function loadConfig(
+  configPath: string,
+  repoRoot: string,
+): Promise<ReviewConfig> {
+  const fullPath = `${repoRoot}/${configPath}`;
 
   try {
-    raw = await Bun.file(configPath).text();
+    await access(fullPath);
   } catch {
-    return DEFAULT_CONFIG;
+    return ConfigSchema.parse({});
   }
 
-  let parsed: unknown;
   try {
-    parsed = parse(raw);
-  } catch (err) {
+    const text = await readFile(fullPath, 'utf-8');
+    const raw = parse(text) as unknown;
+    const result = ConfigSchema.safeParse(raw);
+    if (!result.success) {
+      console.log(
+        '##vso[task.logissue type=warning]Invalid .prreviewer.yml — using defaults',
+      );
+      console.warn(result.error.format());
+      return ConfigSchema.parse({});
+    }
+    return result.data;
+  } catch {
     console.log(
-      `##vso[task.logissue type=warning]Failed to parse config at ${configPath}: ${String(err)}`
+      '##vso[task.logissue type=warning]Failed to parse .prreviewer.yml — using defaults',
     );
-    return DEFAULT_CONFIG;
+    return ConfigSchema.parse({});
   }
-
-  const result = ConfigSchema.safeParse(parsed ?? {});
-  if (!result.success) {
-    console.log(
-      `##vso[task.logissue type=warning]Invalid config at ${configPath}: ${result.error.message}`
-    );
-    return DEFAULT_CONFIG;
-  }
-
-  return {
-    ignore: result.data.ignore,
-    severityThreshold: result.data.severityThreshold,
-    maxFiles: result.data.maxFiles,
-    securityOverrides: result.data.securityOverrides,
-  };
 }

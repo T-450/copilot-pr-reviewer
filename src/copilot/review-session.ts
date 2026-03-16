@@ -1,66 +1,72 @@
-import { CopilotClient, defineTool, approveAll } from "@github/copilot-sdk";
-import type { ChangedFile, Finding, PrMetadata, ReviewConfig } from "../shared/types";
-import { FindingSchema } from "./tool-contract";
-import { createPermissionHook } from "./permission-policy";
-import { buildSystemMessage } from "../core/prompt-builder";
-import { generateFingerprint } from "../core/finding-fingerprint";
+import {
+  CopilotClient,
+  defineTool,
+  approveAll,
+  type ZodSchema,
+} from '@github/copilot-sdk';
+import { FindingSchema } from './tool-contract.js';
+import type { z } from 'zod';
+import {
+  buildSystemMessage,
+  buildReviewPrompt,
+} from '../repo/context-builder.js';
+import {
+  fingerprint,
+  type ChangedFile,
+  type Finding,
+  type PRMetadata,
+  type ReviewConfig,
+} from '../types.js';
+
+type FindingInput = z.infer<typeof FindingSchema>;
 
 export async function reviewFiles(
   files: ChangedFile[],
-  prMeta: PrMetadata,
-  config: ReviewConfig,
-  repoMap: string,
+  prMeta: PRMetadata,
+  _config: ReviewConfig,
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
-  const repoRoot = process.env.REPO_ROOT ?? process.cwd();
 
-  const client = new CopilotClient({
-    cwd: repoRoot,
-    githubToken: process.env.COPILOT_GITHUB_TOKEN,
+  const emitFinding = defineTool<FindingInput>('emit_finding', {
+    description:
+      'Report a code review finding at a specific file and line range.',
+    parameters: FindingSchema as unknown as ZodSchema<FindingInput>,
+    handler: async (args) => {
+      const validated = FindingSchema.parse(args);
+      findings.push({
+        ...validated,
+        fingerprint: fingerprint(
+          validated.filePath,
+          validated.startLine,
+          validated.title,
+        ),
+      });
+      return { ok: true };
+    },
   });
 
+  const repoRoot = process.env.REPO_ROOT!;
+  const systemMessage = await buildSystemMessage(prMeta, files, repoRoot);
+  const reviewPrompt = buildReviewPrompt(files);
+
+  const client = new CopilotClient({ cwd: repoRoot });
+
   const session = await client.createSession({
-    model: process.env.COPILOT_MODEL ?? "gpt-4.1",
-    systemMessage: {
-      content: buildSystemMessage(prMeta, config, repoMap),
-      mode: "append",
-    },
+    model: process.env.COPILOT_MODEL ?? 'gpt-4.1',
+    tools: [emitFinding],
+    systemMessage: { mode: 'append', content: systemMessage },
     onPermissionRequest: approveAll,
-    tools: [
-      defineTool("emit_finding", {
-        description: "Report a code review finding",
-        parameters: FindingSchema,
-        handler: async (params: unknown) => {
-          const parsed = FindingSchema.safeParse(params);
-          if (parsed.success) {
-            const fingerprint = generateFingerprint(parsed.data);
-            findings.push({ ...parsed.data, fingerprint });
-            return "Finding recorded.";
-          }
-          return `Invalid finding: ${JSON.stringify(parsed.error.issues)}`;
-        },
-      }),
-    ],
-    hooks: {
-      onPreToolUse: createPermissionHook(),
-    },
   });
 
   try {
-    for (const file of files) {
-      const prompt = [
-        `## File: ${file.path}`,
-        `Risk: ${file.riskLevel} | Tests: ${file.testStatus} | Change: ${file.changeType}`,
-        "",
-        "```diff",
-        file.diff,
-        "```",
-      ].join("\n");
-      await session.sendAndWait({
-        prompt,
-        attachments: [{ type: "file", path: file.absolutePath, displayName: file.path }],
-      });
-    }
+    await session.sendAndWait({
+      prompt: reviewPrompt,
+      attachments: files.map((f) => ({
+        type: 'file' as const,
+        path: f.absolutePath,
+        displayName: f.path,
+      })),
+    });
   } finally {
     await session.disconnect();
     await client.stop();

@@ -1,77 +1,83 @@
-import type { AdoClient, AdoIteration, AdoIterationChange } from "./types";
-import type { ChangedFile } from "../shared/types";
+import { minimatch } from 'minimatch';
+import type { AdoClient } from './client.js';
+import type { Env, ChangedFile, ReviewConfig } from '../types.js';
+import { classifyRisk, detectTestStatus } from '../repo/context-builder.js';
 
 const BINARY_EXTENSIONS = new Set([
-  ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".svg",
-  ".woff", ".woff2", ".ttf", ".eot",
-  ".mp3", ".mp4",
-  ".zip", ".tar", ".gz",
-  ".dll", ".exe", ".bin",
-  ".pdf",
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.ico',
+  '.svg',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.eot',
+  '.dll',
+  '.exe',
+  '.zip',
+  '.tar.gz',
+  '.wasm',
+  '.map',
 ]);
 
 function isBinary(filePath: string): boolean {
-  const lower = filePath.toLowerCase();
-  for (const ext of BINARY_EXTENSIONS) {
-    if (lower.endsWith(ext)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Sanitizes an ADO-supplied path by stripping the leading slash and rejecting
- * any path that contains `..` segments, which would allow traversal outside repoRoot.
- * Returns null if the path is unsafe.
- */
-function sanitizeAdoPath(adoPath: string): string | null {
-  const stripped = adoPath.startsWith("/") ? adoPath.slice(1) : adoPath;
-  // Reject any segment that is ".." to prevent directory traversal
-  if (stripped.split("/").some((seg) => seg === "..")) {
-    return null;
-  }
-  return stripped;
+  return BINARY_EXTENSIONS.has(filePath.slice(filePath.lastIndexOf('.')));
 }
 
 export async function fetchIncrementalChanges(
   client: AdoClient,
-  prId: string,
-  repoRoot: string,
+  env: Env,
+  config: ReviewConfig,
+  allPaths: string[],
 ): Promise<ChangedFile[]> {
-  const { value: iterations } = await client.get<{ value: AdoIteration[] }>(
-    `/pullRequests/${prId}/iterations`,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const iters = await client.request<any>(
+    `/pullRequests/${env.adoPrId}/iterations?api-version=7.1`,
+  );
+  const iterations: number[] = (
+    (iters.value as Array<{ id: number }>) ?? []
+  ).map((i) => i.id);
+  if (iterations.length === 0) return [];
+
+  const current = Math.max(...iterations);
+  const previous = current > 1 ? current - 1 : 0;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const changes = await client.request<any>(
+    `/pullRequests/${env.adoPrId}/iterations/${current}/changes?$compareTo=${previous}&api-version=7.1`,
   );
 
-  const currentIteration = iterations[iterations.length - 1].id;
-  const previousIteration = iterations.length > 1 ? iterations[iterations.length - 2].id : 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const entries: any[] = (changes.changeEntries as any[]) ?? [];
+  const files: ChangedFile[] = [];
 
-  const { changeEntries } = await client.get<{ changeEntries: AdoIterationChange[] }>(
-    `/pullRequests/${prId}/iterations/${currentIteration}/changes?compareTo=${previousIteration}`,
-  );
+  for (const entry of entries) {
+    const changeType = entry.changeType as number;
+    if (changeType !== 1 /* add */ && changeType !== 2 /* edit */) continue;
 
-  const root = repoRoot.endsWith("/") ? repoRoot.slice(0, -1) : repoRoot;
-  const results: ChangedFile[] = [];
+    const path: string = (entry.item?.path as string) ?? '';
+    if (!path || isBinary(path)) continue;
 
-  for (const c of changeEntries) {
-    if (c.changeType === "rename" || c.changeType === "delete") continue;
-    if (isBinary(c.item.path)) continue;
+    const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
 
-    const path = sanitizeAdoPath(c.item.path);
-    if (path === null) continue;
+    if (config.ignore.some((pattern) => minimatch(normalizedPath, pattern)))
+      continue;
 
-    results.push({
-      path,
-      absolutePath: `${root}/${path}`,
-      diff: "",
-      changeType: c.changeType === "add" ? "add" : "edit",
-      changeTrackingId: c.changeTrackingId,
-      currentIteration,
-      previousIteration,
-      riskLevel: "NORMAL",
-      testStatus: "not_applicable",
+    files.push({
+      path: normalizedPath,
+      absolutePath: `${env.repoRoot}/${normalizedPath}`,
+      diff: '', // populated later via git diff
+      changeType: changeType === 1 ? 'add' : 'edit',
+      changeTrackingId: (entry.changeTrackingId as number) ?? 0,
+      currentIteration: current,
+      previousIteration: previous,
+      riskLevel: classifyRisk(normalizedPath, config.securityOverrides),
+      testStatus: detectTestStatus(normalizedPath, allPaths),
     });
   }
 
-  return results;
+  return files;
 }

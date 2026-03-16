@@ -1,48 +1,75 @@
-import type { AdoThread } from "./types";
-import type { Finding, ChangedFile } from "../shared/types";
+import { setTimeout as sleep } from 'node:timers/promises';
+import type { AdoClient } from './client.js';
+import type { ExistingBotThread } from './comment-poster.js';
+import { createThread, resolveThread } from './comment-poster.js';
+import type { Env, Finding, ChangedFile } from '../types.js';
 
-export type ReconciliationResult = {
-  toCreate: Finding[];
-  toResolve: number[]; // thread IDs
-  toSkip: Finding[];
+export type ReconciliationPlan = {
+  toPost: Array<{ finding: Finding; file: ChangedFile }>;
+  toResolve: ExistingBotThread[];
+  deduped: number;
 };
 
-export function reconcileThreads(
-  existingBotThreads: AdoThread[],
-  newFindings: Finding[],
+export function buildReconciliationPlan(
+  existingThreads: ExistingBotThread[],
+  findings: Finding[],
   files: ChangedFile[],
-): ReconciliationResult {
-  const toCreate: Finding[] = [];
-  const toResolve: number[] = [];
-  const toSkip: Finding[] = [];
+): ReconciliationPlan {
+  const fileByPath = new Map(files.map((f) => [f.path, f]));
+  const newFingerprints = new Set(findings.map((f) => f.fingerprint));
+  const existingFingerprints = new Set(
+    existingThreads.map((t) => t.fingerprint).filter(Boolean),
+  );
+  const activeTrackingIds = new Set(files.map((f) => f.changeTrackingId));
 
-  const currentTrackingIds = new Set(files.map((f) => f.changeTrackingId));
+  const toPost: ReconciliationPlan['toPost'] = [];
+  let deduped = 0;
 
-  const existingByFingerprint = new Map<string, AdoThread>();
-  for (const thread of existingBotThreads) {
-    const content = thread.comments[0]?.content ?? "";
-    const match = content.match(/<!-- fingerprint:(\S+) -->/);
-    if (match) {
-      existingByFingerprint.set(match[1], thread);
+  for (const finding of findings) {
+    if (existingFingerprints.has(finding.fingerprint)) {
+      deduped++;
+      continue;
     }
+    const file = fileByPath.get(finding.filePath);
+    if (file) toPost.push({ finding, file });
   }
 
-  for (const finding of newFindings) {
-    const existing = existingByFingerprint.get(finding.fingerprint);
-    if (existing) {
-      toSkip.push(finding);
-      existingByFingerprint.delete(finding.fingerprint); // mark as matched
-    } else {
-      toCreate.push(finding);
-    }
+  const toResolve: ExistingBotThread[] = [];
+  for (const thread of existingThreads) {
+    if (thread.status === 4) continue;
+    if (!thread.fingerprint) continue;
+    if (
+      !thread.changeTrackingId ||
+      !activeTrackingIds.has(thread.changeTrackingId)
+    )
+      continue;
+    if (!newFingerprints.has(thread.fingerprint)) toResolve.push(thread);
   }
 
-  for (const [, thread] of existingByFingerprint) {
-    const trackingId = thread.pullRequestThreadContext?.changeTrackingId;
-    if (trackingId !== undefined && currentTrackingIds.has(trackingId)) {
-      toResolve.push(thread.id);
-    }
+  return { toPost, toResolve, deduped };
+}
+
+export async function reconcileAndPublish(
+  client: AdoClient,
+  env: Env,
+  existingThreads: ExistingBotThread[],
+  findings: Finding[],
+  files: ChangedFile[],
+): Promise<{ created: number; resolved: number; deduped: number }> {
+  const plan = buildReconciliationPlan(existingThreads, findings, files);
+
+  let created = 0;
+  for (const { finding, file } of plan.toPost) {
+    await createThread(client, env, finding, file);
+    created++;
+    await sleep(200);
   }
 
-  return { toCreate, toResolve, toSkip };
+  let resolved = 0;
+  for (const thread of plan.toResolve) {
+    await resolveThread(client, env, thread.id);
+    resolved++;
+  }
+
+  return { created, resolved, deduped: plan.deduped };
 }

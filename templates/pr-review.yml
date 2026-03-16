@@ -8,58 +8,56 @@ parameters:
   - name: severityThreshold
     type: string
     default: 'suggestion'
-    values: ['critical', 'warning', 'suggestion', 'nitpick']
+    values:
+      - critical
+      - warning
+      - suggestion
+      - nitpick
   - name: variableGroup
     type: string
     default: 'pr-reviewer-secrets'
 
 jobs:
-  - job: AICodeReview
+  - job: CopilotPRReview
     displayName: 'AI Code Review'
     pool:
       vmImage: 'ubuntu-latest'
-    condition: eq(variables['Build.Reason'], 'PullRequest')
-    continueOnError: true
     variables:
       - group: ${{ parameters.variableGroup }}
     steps:
-      - script: |
-          curl -fsSL https://bun.sh/install | bash
-          echo "##vso[task.prependpath]$HOME/.bun/bin"
-        displayName: 'Install Bun'
+      - task: NodeTool@0
+        inputs:
+          versionSpec: '22.x'
+        displayName: 'Install Node.js 22'
 
-      - script: |
-          npm install -g @github/copilot
+      - script: npm install -g @anthropic-ai/copilot-cli
         displayName: 'Install Copilot CLI'
 
-      - checkout: pr-reviewer
-        path: pr-reviewer
-
       - checkout: self
-        path: source-repo
+        path: 'source-repo'
         fetchDepth: 0
 
-      - script: |
-          cd $(Pipeline.Workspace)/pr-reviewer
-          bun install --frozen-lockfile --linker isolated
-        displayName: 'Install dependencies'
+      - checkout: git://$(System.TeamProject)/copilot-pr-reviewer
+        path: 'pr-reviewer'
 
       - script: |
           cd $(Pipeline.Workspace)/pr-reviewer
-          bun run src/index.ts || true
-        displayName: 'Run AI Code Review'
+          npm ci
+        displayName: 'Install reviewer dependencies'
+
+      - script: |
+          cd $(Pipeline.Workspace)/pr-reviewer
+          npx tsx src/index.ts
+        displayName: 'Run PR Review'
         env:
           ADO_PAT: $(ADO_PAT)
           ADO_ORG: $(System.CollectionUri)
           ADO_PROJECT: $(System.TeamProject)
           ADO_REPO_ID: $(Build.Repository.ID)
           ADO_PR_ID: $(System.PullRequest.PullRequestId)
+          COPILOT_GITHUB_TOKEN: $(COPILOT_GITHUB_TOKEN)
           REPO_ROOT: $(Pipeline.Workspace)/source-repo
           CONFIG_PATH: ${{ parameters.configPath }}
           MAX_FILES: ${{ parameters.maxFiles }}
           SEVERITY_THRESHOLD: ${{ parameters.severityThreshold }}
-          COPILOT_GITHUB_TOKEN: $(COPILOT_GITHUB_TOKEN)
-          OTEL_SERVICE_NAME: copilot-pr-reviewer
-          OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=ci,service.namespace=engineering-productivity
-          OTEL_EXPORTER_OTLP_ENDPOINT: $(OTEL_EXPORTER_OTLP_ENDPOINT)
-          OTEL_EXPORTER_OTLP_HEADERS: $(OTEL_EXPORTER_OTLP_HEADERS)
+        continueOnError: true

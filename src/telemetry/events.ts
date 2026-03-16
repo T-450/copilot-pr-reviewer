@@ -1,34 +1,73 @@
-import { logs, SeverityNumber } from "@opentelemetry/api-logs";
+import { reviewRunId } from './setup.js';
 
-export type EventAttrs = Record<string, string | number | boolean>;
+type EventBase = {
+  event_name: string;
+  review_run_id: string;
+  [key: string]: unknown;
+};
 
-function emitEvent(name: string, severity: SeverityNumber, attrs: EventAttrs = {}): void {
-  try {
-    const logger = logs.getLogger("copilot-pr-reviewer");
-    logger.emit({
-      severityNumber: severity,
-      body: name,
-      attributes: { "event.name": name, ...attrs },
-    });
-  } catch {
-    // Noop if logs API unavailable
-  }
+function emit(event: EventBase): void {
+  console.log(
+    JSON.stringify({ ...event, timestamp: new Date().toISOString() }),
+  );
 }
 
-export const events = {
-  reviewStarted: (attrs?: EventAttrs) => emitEvent("prreviewer.run.started", SeverityNumber.INFO, attrs),
-  reviewCompleted: (attrs?: EventAttrs) => emitEvent("prreviewer.run.completed", SeverityNumber.INFO, attrs),
-  reviewFailed: (attrs?: EventAttrs) => emitEvent("prreviewer.run.failed", SeverityNumber.ERROR, attrs),
-  configLoaded: (attrs?: EventAttrs) => emitEvent("prreviewer.config.loaded", SeverityNumber.INFO, attrs),
-  configDefaulted: (attrs?: EventAttrs) => emitEvent("prreviewer.config.invalid", SeverityNumber.WARN, attrs),
-  filesFiltered: (attrs?: EventAttrs) => emitEvent("prreviewer.file.skipped", SeverityNumber.INFO, attrs),
-  fileReviewed: (attrs?: EventAttrs) => emitEvent("prreviewer.file.reviewed", SeverityNumber.INFO, attrs),
-  findingEmitted: (attrs?: EventAttrs) => emitEvent("prreviewer.finding.emitted", SeverityNumber.INFO, attrs),
-  findingSuppressed: (attrs?: EventAttrs) => emitEvent("prreviewer.finding.suppressed", SeverityNumber.INFO, attrs),
-  threadCreated: (attrs?: EventAttrs) => emitEvent("prreviewer.thread.created", SeverityNumber.INFO, attrs),
-  threadUpdated: (attrs?: EventAttrs) => emitEvent("prreviewer.thread.updated", SeverityNumber.INFO, attrs),
-  threadResolved: (attrs?: EventAttrs) => emitEvent("prreviewer.thread.resolved", SeverityNumber.INFO, attrs),
-  threadSkipped: (attrs?: EventAttrs) => emitEvent("prreviewer.thread.deduped", SeverityNumber.DEBUG, attrs),
-  authFailed: (attrs?: EventAttrs) => emitEvent("prreviewer.auth.failed", SeverityNumber.ERROR, attrs),
-  rateLimited: (attrs?: EventAttrs) => emitEvent("prreviewer.rate_limit.hit", SeverityNumber.WARN, attrs),
-};
+export function emitRunStarted(env: {
+  adoOrg: string;
+  adoProject: string;
+  adoRepoId: string;
+  adoPrId: string;
+}): void {
+  emit({
+    event_name: 'prreviewer.run.started',
+    review_run_id: reviewRunId,
+    'ado.organization': env.adoOrg,
+    'ado.project': env.adoProject,
+    'ado.repository': env.adoRepoId,
+    'ado.pull_request.id': env.adoPrId,
+  });
+}
+
+export function emitRunCompleted(stats: {
+  filesChanged: number;
+  filesReviewed: number;
+  findingsCount: number;
+  threadsCreated: number;
+  threadsResolved: number;
+  threadsDeduped: number;
+  durationMs: number;
+}): void {
+  emit({
+    event_name: 'prreviewer.run.completed',
+    review_run_id: reviewRunId,
+    ...stats,
+  });
+}
+
+export function emitRunFailed(error: string): void {
+  emit({
+    event_name: 'prreviewer.run.failed',
+    review_run_id: reviewRunId,
+    'error.type': error,
+  });
+}
+
+export function emitFindingEmitted(finding: {
+  filePath: string;
+  severity: string;
+  category: string;
+  fingerprint: string;
+  riskLevel: string;
+  hasSuggestion: boolean;
+}): void {
+  emit({
+    event_name: 'prreviewer.finding.emitted',
+    review_run_id: reviewRunId,
+    'file.path': finding.filePath,
+    'finding.severity': finding.severity,
+    'finding.category': finding.category,
+    'finding.fingerprint': finding.fingerprint,
+    'review.risk_level': finding.riskLevel,
+    'finding.has_suggestion': finding.hasSuggestion,
+  });
+}

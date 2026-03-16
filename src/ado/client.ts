@@ -1,60 +1,43 @@
-import { AuthError, RateLimitError, logPipelineWarning } from "../shared/errors";
-import type { AdoClient } from "./types";
+import { setTimeout as sleep } from 'node:timers/promises';
+import type { Env } from '../types.js';
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
-export function createAdoClient(
-  orgUrl: string,
-  project: string,
-  repoId: string,
-  pat: string,
-  retryDelayMs: number = BASE_DELAY_MS,
-): AdoClient {
-  const baseUrl = `${orgUrl.replace(/\/$/, "")}/${project}/_apis/git/repositories/${repoId}`;
-  const headers = {
-    Authorization: `Basic ${btoa(":" + pat)}`,
-    "Content-Type": "application/json",
+export function createAdoClient(env: Env) {
+  const baseUrl = `${env.adoOrg}/${env.adoProject}/_apis/git/repositories/${env.adoRepoId}`;
+  const headers: Record<string, string> = {
+    Authorization: `Basic ${Buffer.from(`:${env.adoPat}`).toString('base64')}`,
+    'Content-Type': 'application/json',
   };
 
-  async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const separator = path.includes("?") ? "&" : "?";
-    const url = `${baseUrl}${path}${separator}api-version=7.1`;
-
+  async function request<T>(path: string, init?: RequestInit): Promise<T> {
+    const url = `${baseUrl}${path}`;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      const response = await fetch(url, {
-        method,
-        headers,
-        body: body ? JSON.stringify(body) : undefined,
+      const res = await fetch(url, {
+        ...init,
+        headers: { ...headers, ...init?.headers },
       });
 
-      if (response.status === 401) {
-        logPipelineWarning("Azure DevOps PAT authentication failed — token may be expired or revoked.");
-        throw new AuthError("ado", "Azure DevOps API returned 401 Unauthorized");
+      if (res.status === 401) {
+        console.log(
+          '##vso[task.logissue type=warning]ADO PAT returned 401 — token may be expired',
+        );
+        throw new Error('ADO auth failed (401)');
       }
-
-      if (response.status === 429) {
-        if (attempt < MAX_RETRIES) {
-          const delay = retryDelayMs * Math.pow(2, attempt) + Math.random() * 500;
-          await Bun.sleep(delay);
-          continue;
-        }
-        throw new RateLimitError();
+      if (res.status === 429 && attempt < MAX_RETRIES) {
+        const delay = BASE_DELAY_MS * 2 ** attempt;
+        console.warn(`ADO rate limited, retrying in ${delay}ms...`);
+        await sleep(delay);
+        continue;
       }
-
-      if (!response.ok) {
-        throw new Error(`Azure DevOps API error: ${response.status} ${response.statusText}`);
-      }
-
-      return (await response.json()) as T;
+      if (!res.ok) throw new Error(`ADO API ${res.status}: ${url}`);
+      return (await res.json()) as T;
     }
-
-    throw new RateLimitError();
+    throw new Error(`ADO API exhausted retries: ${path}`);
   }
 
-  return {
-    get: <T>(path: string) => request<T>("GET", path),
-    post: <T>(path: string, body: unknown) => request<T>("POST", path, body),
-    patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
-  };
+  return { request, baseUrl };
 }
+
+export type AdoClient = ReturnType<typeof createAdoClient>;
