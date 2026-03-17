@@ -1,150 +1,59 @@
-# volvo-pr-reviewer
+# copilot-pr-reviewer
 
-AI code reviewer for Azure DevOps pull requests. Runs as a pipeline task using the GitHub Copilot SDK and Bun.js. Zero hosting cost -- executes on Microsoft-hosted Ubuntu agents during PR build validation.
+Automated PR code reviewer for Azure DevOps, powered by GitHub Copilot SDK (`@github/copilot-sdk`). Runs as an Azure DevOps pipeline task that reviews changed files in a PR iteration, posts findings as threaded comments, and auto-resolves stale comments when issues are fixed.
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) v1.3+
-- A GitHub Copilot license (for the Copilot SDK token)
-- An Azure DevOps PAT with **Code (Read & Write)** scope
+- [Bun](https://bun.sh/) >= 1.0.26
+- A GitHub token with Copilot access
+- An Azure DevOps PAT with PR comment permissions
 
-## Local Development
-
-### 1. Install dependencies
+## Setup
 
 ```bash
 bun install
+cp .env.example .env
+# Fill in the required values in .env
 ```
 
-### 2. Run tests
+## Commands
 
-```bash
-bun test
-```
+| Command | Description |
+|---------|-------------|
+| `bun run start` | Run the reviewer (requires env vars) |
+| `bun test` | Run all tests |
+| `bun test --watch` | Watch mode |
+| `bun test --coverage` | Coverage report |
+| `bun run typecheck` | TypeScript strict checking (`tsc --noEmit`) |
+| `bun run biome:fix` | Lint + format with Biome |
 
-### 3. Type-check
+## Environment Variables
 
-```bash
-bun tsc --noEmit
-```
-
-### 4. Run locally (dry run against a real PR)
-
-Set the required environment variables, then:
-
-```bash
-bun run src/index.ts
-```
-
-#### Required environment variables
-
-| Variable | Description |
-|----------|-------------|
-| `ADO_PAT` | Azure DevOps Personal Access Token |
-| `ADO_ORG` | Azure DevOps org URL (e.g. `https://dev.azure.com/myorg`) |
-| `ADO_PROJECT` | Azure DevOps project name |
-| `ADO_REPO_ID` | Repository ID (GUID) |
-| `ADO_PR_ID` | Pull request ID to review |
-| `COPILOT_GITHUB_TOKEN` | GitHub token with Copilot access |
-
-#### Optional environment variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `REPO_ROOT` | `process.cwd()` | Path to the checked-out source repo |
-| `CONFIG_PATH` | `.prreviewer.yml` | Path to the reviewer config file |
-| `MAX_FILES` | `30` | Maximum files to review per run |
-| `SEVERITY_THRESHOLD` | `suggestion` | Minimum severity to report (`critical`, `warning`, `suggestion`, `nitpick`) |
-| `COPILOT_MODEL` | `gpt-4.1` | Model to use for reviews |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(none)_ | OTLP endpoint for telemetry (omit for noop) |
-| `OTEL_SERVICE_NAME` | `copilot-pr-reviewer` | OTel service name |
-
-## Pipeline Setup
-
-### 1. Create a variable group
-
-In Azure DevOps, create a variable group named `pr-reviewer-secrets` with:
-
-- `ADO_PAT` -- PAT with Code Read & Write on the target repos
-- `COPILOT_GITHUB_TOKEN` -- GitHub token with Copilot access
-- `OTEL_EXPORTER_OTLP_ENDPOINT` _(optional)_ -- OTLP collector URL
-- `OTEL_EXPORTER_OTLP_HEADERS` _(optional)_ -- Auth headers for the collector
-
-### 2. Push this repo to Azure DevOps
-
-Push `volvo-pr-reviewer` to an Azure DevOps Git repository (e.g. `YourProject/copilot-pr-reviewer`).
-
-### 3. Add the pipeline to consuming repos
-
-In each repo you want reviewed, create an `azure-pipelines.yml`:
-
-```yaml
-resources:
-  repositories:
-    - repository: pr-reviewer
-      type: git
-      name: YourProject/copilot-pr-reviewer
-      ref: refs/heads/main
-
-extends:
-  template: templates/pr-review.yml@pr-reviewer
-  parameters:
-    configPath: .prreviewer.yml    # optional
-    maxFiles: 30                   # optional
-    severityThreshold: suggestion  # optional
-```
-
-### 4. Configure per-repo settings (optional)
-
-Add a `.prreviewer.yml` to the root of each consuming repo:
-
-```yaml
-ignore:
-  - "*.md"
-  - "**/*.generated.ts"
-
-severityThreshold: warning
-maxFiles: 20
-
-securityOverrides:
-  - path: "src/payments/**"
-    risk: HIGH_RISK
-```
-
-### 5. Add Copilot instructions (optional)
-
-The reviewer automatically picks up:
-
-- `.github/copilot-instructions.md` -- repo-wide coding standards
-- `.github/instructions/**/*.instructions.md` -- path-specific rules
-- `AGENTS.md` -- agent-level guidance
-
-See `templates/copilot-instructions-example.md` and `templates/security-instructions-example.md` for starter templates.
-
-## Architecture
-
-```ASCII
-src/
-  index.ts              Entry point -- calls runReview(), always exits 0
-  core/                 Orchestration, prompt building, fingerprinting, filtering
-  ado/                  Azure DevOps REST API: PR metadata, diffs, comments, reconciliation
-  copilot/              Copilot SDK session, emit_finding tool, permission policy
-  repo/                 Security risk tagging, test companion detection, repo map
-  config/               .prreviewer.yml loading and Zod validation
-  shared/               Shared types and error classes
-  telemetry/            OpenTelemetry instrumentation (traces, metrics, events)
-templates/
-  pr-review.yml         Azure DevOps pipeline template
-  copilot-instructions-example.md
-  security-instructions-example.md
-```
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `COPILOT_GITHUB_TOKEN` | Yes | GitHub token for Copilot SDK auth |
+| `ADO_PAT` | Yes | Azure DevOps personal access token |
+| `ADO_ORG` | Yes | Azure DevOps organization name |
+| `ADO_PROJECT` | Yes | Azure DevOps project name |
+| `ADO_REPO_ID` | Yes | Repository ID |
+| `ADO_PR_ID` | Yes | Pull request ID |
+| `CONFIG_PATH` | No | Path to config file (default: `.prreviewer.yml`) |
+| `COPILOT_MODEL` | No | Model to use (default: `gpt-4.1`) |
+| `REPO_ROOT` | No | Repository root path (default: `process.cwd()`) |
 
 ## How It Works
 
-1. PR triggers the pipeline on a hosted Ubuntu agent
-2. The orchestrator fetches the iteration diff, PR metadata, and existing bot threads in parallel
-3. Files are classified by security risk (path heuristics) and test companion status
-4. A single Copilot SDK session reviews all files -- the model emits findings via `emit_finding` only
-5. The thread reconciler compares new findings against existing bot threads by fingerprint and `changeTrackingId`
-6. New threads are created, stale threads are resolved, duplicates are skipped
-7. The pipeline always exits 0 -- findings are advisory, never blocking
+1. Fetches PR metadata and iteration diff from Azure DevOps
+2. Creates a Copilot SDK session with a custom `emit_finding` tool
+3. Reviews each changed file (with optional security and test sub-agents)
+4. Clusters similar findings to reduce comment noise
+5. Reconciles new findings against existing bot threads
+6. Posts new comments and auto-resolves stale ones
+
+## Configuration
+
+Create a `.prreviewer.yml` in your repo root to customize behavior (severity threshold, ignored paths, clustering, max files, etc.). See `src/config.ts` for the schema and defaults.
+
+## License
+
+MIT

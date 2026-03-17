@@ -1,0 +1,834 @@
+import {
+	describe,
+	expect,
+	test,
+	mock,
+	spyOn,
+	beforeEach,
+	afterEach,
+} from "bun:test";
+import {
+	reconcile,
+	collectFeedback,
+	fetchPRMetadata,
+	fetchIterationDiff,
+	listBotThreads,
+	createThread,
+	resolveThread,
+	type BotThread,
+	type ChangedFile,
+} from "../src/ado/client.ts";
+import type { Finding } from "../src/types.ts";
+
+// --- Factories ---
+
+function makeFinding(overrides: Partial<Finding> = {}): Finding {
+	return {
+		filePath: "src/app.ts",
+		startLine: 10,
+		endLine: 15,
+		severity: "warning",
+		category: "correctness",
+		title: "Possible null dereference",
+		message: "Variable may be null",
+		confidence: "high",
+		fingerprint: "abc123",
+		...overrides,
+	};
+}
+
+function makeThread(overrides: Partial<BotThread> = {}): BotThread {
+	return {
+		id: 1,
+		filePath: "src/app.ts",
+		fingerprint: "abc123",
+		status: 1,
+		...overrides,
+	};
+}
+
+function makeFile(overrides: Partial<ChangedFile> = {}): ChangedFile {
+	return {
+		path: "src/app.ts",
+		changeType: 2,
+		changeTrackingId: 100,
+		...overrides,
+	};
+}
+
+// --- Helpers ---
+
+function jsonResponse(body: unknown, status = 200): Response {
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { "Content-Type": "application/json" },
+	});
+}
+
+function errorResponse(
+	status: number,
+	statusText: string,
+	headers?: Record<string, string>,
+): Response {
+	return new Response(null, { status, statusText, headers });
+}
+
+// --- Env setup ---
+
+const ENV_VARS = {
+	ADO_ORG: "test-org",
+	ADO_PROJECT: "test-project",
+	ADO_REPO_ID: "repo-1",
+	ADO_PR_ID: "42",
+	ADO_PAT: "test-pat-token",
+};
+
+function setEnv(): void {
+	for (const [key, val] of Object.entries(ENV_VARS)) {
+		process.env[key] = val;
+	}
+}
+
+function clearEnv(): void {
+	for (const key of Object.keys(ENV_VARS)) {
+		delete process.env[key];
+	}
+}
+
+// --- Tests ---
+
+describe("reconcile", () => {
+	test("new finding not in existing threads → toPost", () => {
+		const existingThreads: BotThread[] = [];
+		const findings = [makeFinding({ fingerprint: "new123" })];
+		const files = [makeFile()];
+
+		const result = reconcile(existingThreads, findings, files);
+
+		expect(result.pendingThreads).toHaveLength(1);
+		expect(result.pendingThreads[0].finding.fingerprint).toBe("new123");
+		expect(result.threadsForReview).toHaveLength(0);
+	});
+
+	test("same fingerprint in existing thread and findings → skip", () => {
+		const existingThreads = [makeThread({ fingerprint: "abc123" })];
+		const findings = [makeFinding({ fingerprint: "abc123" })];
+		const files = [makeFile()];
+
+		const result = reconcile(existingThreads, findings, files);
+
+		expect(result.pendingThreads).toHaveLength(0);
+		expect(result.threadsForReview).toHaveLength(0);
+	});
+
+	test("existing thread for file in diff but fingerprint gone → toResolve", () => {
+		const existingThreads = [
+			makeThread({ fingerprint: "old123", filePath: "src/app.ts" }),
+		];
+		const findings = [makeFinding({ fingerprint: "new456" })];
+		const files = [makeFile({ path: "src/app.ts" })];
+
+		const result = reconcile(existingThreads, findings, files);
+
+		expect(result.pendingThreads).toHaveLength(1);
+		expect(result.threadsForReview).toHaveLength(1);
+		expect(result.threadsForReview[0]).toBe(1);
+	});
+
+	test("existing thread for file NOT in diff → untouched", () => {
+		const existingThreads = [
+			makeThread({ fingerprint: "old123", filePath: "src/other.ts" }),
+		];
+		const findings: Finding[] = [];
+		const files = [makeFile({ path: "src/app.ts" })];
+
+		const result = reconcile(existingThreads, findings, files);
+
+		expect(result.pendingThreads).toHaveLength(0);
+		expect(result.threadsForReview).toHaveLength(0);
+	});
+
+	test("already resolved thread is not re-resolved", () => {
+		const existingThreads = [
+			makeThread({
+				fingerprint: "old123",
+				filePath: "src/app.ts",
+				status: 2,
+			}),
+		];
+		const findings: Finding[] = [];
+		const files = [makeFile({ path: "src/app.ts" })];
+
+		const result = reconcile(existingThreads, findings, files);
+
+		expect(result.threadsForReview).toHaveLength(0);
+	});
+
+	test("maps finding to correct file in toPost", () => {
+		const files = [
+			makeFile({ path: "src/app.ts", changeTrackingId: 100 }),
+			makeFile({ path: "src/utils.ts", changeTrackingId: 200 }),
+		];
+		const findings = [
+			makeFinding({ filePath: "src/utils.ts", fingerprint: "util1" }),
+		];
+
+		const result = reconcile([], findings, files);
+
+		expect(result.pendingThreads).toHaveLength(1);
+		expect(result.pendingThreads[0].file.changeTrackingId).toBe(200);
+	});
+});
+
+describe("collectFeedback", () => {
+	test("status 2 (resolved) → addressed", async () => {
+		const threads = [makeThread({ status: 2, fingerprint: "fp1" })];
+		const result = await collectFeedback(threads, false);
+
+		expect(result).toHaveLength(1);
+		expect(result[0].signal).toBe("addressed");
+	});
+
+	test("status 3 → rejected", async () => {
+		const threads = [makeThread({ status: 3, fingerprint: "fp1" })];
+		const result = await collectFeedback(threads, false);
+
+		expect(result).toHaveLength(1);
+		expect(result[0].signal).toBe("rejected");
+	});
+
+	test("status 4 → rejected", async () => {
+		const threads = [makeThread({ status: 4, fingerprint: "fp1" })];
+		const result = await collectFeedback(threads, false);
+
+		expect(result).toHaveLength(1);
+		expect(result[0].signal).toBe("rejected");
+	});
+
+	test("status 1 with prMerged=true → ignored", async () => {
+		const threads = [makeThread({ status: 1, fingerprint: "fp1" })];
+		const result = await collectFeedback(threads, true);
+
+		expect(result).toHaveLength(1);
+		expect(result[0].signal).toBe("ignored");
+	});
+
+	test("status 1 with prMerged=false → filtered out", async () => {
+		const threads = [makeThread({ status: 1, fingerprint: "fp1" })];
+		const result = await collectFeedback(threads, false);
+
+		expect(result).toHaveLength(0);
+	});
+
+	test("empty fingerprint → filtered out", async () => {
+		const threads = [makeThread({ status: 2, fingerprint: "" })];
+		const result = await collectFeedback(threads, false);
+
+		expect(result).toHaveLength(0);
+	});
+
+	test("includes threadId in signal", async () => {
+		const threads = [makeThread({ id: 99, status: 2, fingerprint: "fp1" })];
+		const result = await collectFeedback(threads, false);
+
+		expect(result[0].threadId).toBe(99);
+	});
+});
+
+describe("fetchPRMetadata", () => {
+	let fetchSpy: ReturnType<typeof spyOn>;
+
+	beforeEach(() => {
+		setEnv();
+		fetchSpy = spyOn(globalThis, "fetch");
+	});
+
+	afterEach(() => {
+		mock.restore();
+		clearEnv();
+	});
+
+	test("returns PR title, description, and work item IDs", async () => {
+		fetchSpy.mockImplementation((url: string | URL | Request) => {
+			const urlStr = typeof url === "string" ? url : url.toString();
+			if (urlStr.includes("/workitems")) {
+				return Promise.resolve(
+					jsonResponse({ value: [{ id: 101 }, { id: 202 }] }),
+				);
+			}
+			return Promise.resolve(
+				jsonResponse({ title: "Fix bug", description: "A fix" }),
+			);
+		});
+
+		const result = await fetchPRMetadata();
+
+		expect(result.title).toBe("Fix bug");
+		expect(result.description).toBe("A fix");
+		expect(result.workItemIds).toEqual([101, 202]);
+	});
+
+	test("returns empty description when undefined", async () => {
+		fetchSpy.mockImplementation((url: string | URL | Request) => {
+			const urlStr = typeof url === "string" ? url : url.toString();
+			if (urlStr.includes("/workitems")) {
+				return Promise.resolve(jsonResponse({ value: [] }));
+			}
+			return Promise.resolve(
+				jsonResponse({ title: "No desc", description: undefined }),
+			);
+		});
+
+		const result = await fetchPRMetadata();
+
+		expect(result.description).toBe("");
+	});
+
+	test("returns empty workItemIds when workitems fetch fails", async () => {
+		fetchSpy.mockImplementation((url: string | URL | Request) => {
+			const urlStr = typeof url === "string" ? url : url.toString();
+			if (urlStr.includes("/workitems")) {
+				return Promise.reject(new Error("Network error"));
+			}
+			return Promise.resolve(
+				jsonResponse({ title: "PR Title", description: "desc" }),
+			);
+		});
+
+		const result = await fetchPRMetadata();
+
+		expect(result.title).toBe("PR Title");
+		expect(result.workItemIds).toEqual([]);
+	});
+
+	test("appends api-version to URL", async () => {
+		fetchSpy.mockImplementation((url: string | URL | Request) => {
+			const urlStr = typeof url === "string" ? url : url.toString();
+			if (urlStr.includes("/workitems")) {
+				return Promise.resolve(jsonResponse({ value: [] }));
+			}
+			return Promise.resolve(jsonResponse({ title: "T", description: "D" }));
+		});
+
+		await fetchPRMetadata();
+
+		const firstCallUrl = fetchSpy.mock.calls[0][0] as string;
+		expect(firstCallUrl).toContain("api-version=7.1");
+	});
+
+	test("sends Basic auth header", async () => {
+		fetchSpy.mockImplementation((url: string | URL | Request) => {
+			const urlStr = typeof url === "string" ? url : url.toString();
+			if (urlStr.includes("/workitems")) {
+				return Promise.resolve(jsonResponse({ value: [] }));
+			}
+			return Promise.resolve(jsonResponse({ title: "T", description: "D" }));
+		});
+
+		await fetchPRMetadata();
+
+		const firstCallInit = fetchSpy.mock.calls[0][1] as RequestInit;
+		const authHeader = (firstCallInit.headers as Record<string, string>)
+			.Authorization;
+		const expected = `Basic ${Buffer.from(":test-pat-token").toString("base64")}`;
+		expect(authHeader).toBe(expected);
+	});
+});
+
+describe("fetchIterationDiff", () => {
+	let fetchSpy: ReturnType<typeof spyOn>;
+
+	beforeEach(() => {
+		setEnv();
+		fetchSpy = spyOn(globalThis, "fetch");
+	});
+
+	afterEach(() => {
+		mock.restore();
+		clearEnv();
+	});
+
+	test("returns current/previous iterations and filtered files", async () => {
+		fetchSpy.mockImplementation((url: string | URL | Request) => {
+			const urlStr = typeof url === "string" ? url : url.toString();
+			if (urlStr.includes("/iterations") && !urlStr.includes("/changes")) {
+				return Promise.resolve(jsonResponse({ value: [{ id: 1 }, { id: 2 }] }));
+			}
+			return Promise.resolve(
+				jsonResponse({
+					changeEntries: [
+						{
+							changeTrackingId: 1,
+							item: { path: "/src/app.ts" },
+							changeType: "add",
+						},
+						{
+							changeTrackingId: 2,
+							item: { path: "/src/utils.ts" },
+							changeType: "edit",
+						},
+						{
+							changeTrackingId: 3,
+							item: { path: "/src/old.ts" },
+							changeType: "delete",
+						},
+					],
+				}),
+			);
+		});
+
+		const result = await fetchIterationDiff();
+
+		expect(result.currentIteration).toBe(2);
+		expect(result.previousIteration).toBe(1);
+		expect(result.files).toHaveLength(2);
+		expect(result.files[0].path).toBe("src/app.ts");
+		expect(result.files[0].changeType).toBe(1);
+		expect(result.files[1].path).toBe("src/utils.ts");
+		expect(result.files[1].changeType).toBe(2);
+	});
+
+	test("single iteration sets previousIteration to 0", async () => {
+		fetchSpy.mockImplementation((url: string | URL | Request) => {
+			const urlStr = typeof url === "string" ? url : url.toString();
+			if (urlStr.includes("/iterations") && !urlStr.includes("/changes")) {
+				return Promise.resolve(jsonResponse({ value: [{ id: 1 }] }));
+			}
+			return Promise.resolve(jsonResponse({ changeEntries: [] }));
+		});
+
+		const result = await fetchIterationDiff();
+
+		expect(result.currentIteration).toBe(1);
+		expect(result.previousIteration).toBe(0);
+	});
+
+	test("filters out binary extensions", async () => {
+		fetchSpy.mockImplementation((url: string | URL | Request) => {
+			const urlStr = typeof url === "string" ? url : url.toString();
+			if (urlStr.includes("/iterations") && !urlStr.includes("/changes")) {
+				return Promise.resolve(jsonResponse({ value: [{ id: 1 }] }));
+			}
+			return Promise.resolve(
+				jsonResponse({
+					changeEntries: [
+						{
+							changeTrackingId: 1,
+							item: { path: "/assets/logo.png" },
+							changeType: "add",
+						},
+						{
+							changeTrackingId: 2,
+							item: { path: "/lib/code.wasm" },
+							changeType: "add",
+						},
+						{
+							changeTrackingId: 3,
+							item: { path: "/src/valid.ts" },
+							changeType: "add",
+						},
+					],
+				}),
+			);
+		});
+
+		const result = await fetchIterationDiff();
+
+		expect(result.files).toHaveLength(1);
+		expect(result.files[0].path).toBe("src/valid.ts");
+	});
+
+	test("handles numeric changeType values", async () => {
+		fetchSpy.mockImplementation((url: string | URL | Request) => {
+			const urlStr = typeof url === "string" ? url : url.toString();
+			if (urlStr.includes("/iterations") && !urlStr.includes("/changes")) {
+				return Promise.resolve(jsonResponse({ value: [{ id: 1 }] }));
+			}
+			return Promise.resolve(
+				jsonResponse({
+					changeEntries: [
+						{
+							changeTrackingId: 1,
+							item: { path: "/src/foo.ts" },
+							changeType: 1,
+						},
+						{
+							changeTrackingId: 2,
+							item: { path: "/src/bar.ts" },
+							changeType: 2,
+						},
+						{
+							changeTrackingId: 3,
+							item: { path: "/src/baz.ts" },
+							changeType: 3,
+						},
+					],
+				}),
+			);
+		});
+
+		const result = await fetchIterationDiff();
+
+		expect(result.files).toHaveLength(2);
+		expect(result.files[0].changeType).toBe(1);
+		expect(result.files[1].changeType).toBe(2);
+	});
+
+	test("strips leading slash from paths", async () => {
+		fetchSpy.mockImplementation((url: string | URL | Request) => {
+			const urlStr = typeof url === "string" ? url : url.toString();
+			if (urlStr.includes("/iterations") && !urlStr.includes("/changes")) {
+				return Promise.resolve(jsonResponse({ value: [{ id: 1 }] }));
+			}
+			return Promise.resolve(
+				jsonResponse({
+					changeEntries: [
+						{
+							changeTrackingId: 1,
+							item: { path: "/src/app.ts" },
+							changeType: "add",
+						},
+					],
+				}),
+			);
+		});
+
+		const result = await fetchIterationDiff();
+
+		expect(result.files[0].path).toBe("src/app.ts");
+	});
+
+	test("includes $compareTo param when previous iteration exists", async () => {
+		fetchSpy.mockImplementation((url: string | URL | Request) => {
+			const urlStr = typeof url === "string" ? url : url.toString();
+			if (urlStr.includes("/iterations") && !urlStr.includes("/changes")) {
+				return Promise.resolve(jsonResponse({ value: [{ id: 1 }, { id: 2 }] }));
+			}
+			return Promise.resolve(jsonResponse({ changeEntries: [] }));
+		});
+
+		await fetchIterationDiff();
+
+		const changesCallUrl = fetchSpy.mock.calls[1][0] as string;
+		expect(changesCallUrl).toContain("$compareTo=1");
+	});
+});
+
+describe("listBotThreads", () => {
+	let fetchSpy: ReturnType<typeof spyOn>;
+
+	beforeEach(() => {
+		setEnv();
+		fetchSpy = spyOn(globalThis, "fetch");
+	});
+
+	afterEach(() => {
+		mock.restore();
+		clearEnv();
+	});
+
+	test("returns only threads with bot marker", async () => {
+		fetchSpy.mockResolvedValue(
+			jsonResponse({
+				value: [
+					{
+						id: 1,
+						status: 1,
+						threadContext: { filePath: "src/a.ts" },
+						comments: [
+							{
+								content:
+									"<!-- copilot-pr-reviewer-bot -->\n<!-- fingerprint:fp1 -->",
+							},
+						],
+					},
+					{
+						id: 2,
+						status: 1,
+						threadContext: { filePath: "src/b.ts" },
+						comments: [{ content: "Human comment" }],
+					},
+				],
+			}),
+		);
+
+		const result = await listBotThreads();
+
+		expect(result).toHaveLength(1);
+		expect(result[0].id).toBe(1);
+	});
+
+	test("extracts fingerprint from comment", async () => {
+		fetchSpy.mockResolvedValue(
+			jsonResponse({
+				value: [
+					{
+						id: 1,
+						status: 1,
+						threadContext: { filePath: "src/a.ts" },
+						comments: [
+							{
+								content:
+									"<!-- copilot-pr-reviewer-bot -->\n<!-- fingerprint:abc123def456 -->",
+							},
+						],
+					},
+				],
+			}),
+		);
+
+		const result = await listBotThreads();
+
+		expect(result[0].fingerprint).toBe("abc123def456");
+	});
+
+	test("returns empty fingerprint when no fingerprint marker", async () => {
+		fetchSpy.mockResolvedValue(
+			jsonResponse({
+				value: [
+					{
+						id: 1,
+						status: 1,
+						threadContext: { filePath: "src/a.ts" },
+						comments: [{ content: "<!-- copilot-pr-reviewer-bot -->" }],
+					},
+				],
+			}),
+		);
+
+		const result = await listBotThreads();
+
+		expect(result[0].fingerprint).toBe("");
+	});
+
+	test("returns empty filePath when threadContext missing", async () => {
+		fetchSpy.mockResolvedValue(
+			jsonResponse({
+				value: [
+					{
+						id: 1,
+						status: 1,
+						comments: [
+							{
+								content:
+									"<!-- copilot-pr-reviewer-bot -->\n<!-- fingerprint:fp1 -->",
+							},
+						],
+					},
+				],
+			}),
+		);
+
+		const result = await listBotThreads();
+
+		expect(result[0].filePath).toBe("");
+	});
+});
+
+describe("createThread", () => {
+	let fetchSpy: ReturnType<typeof spyOn>;
+
+	beforeEach(() => {
+		setEnv();
+		fetchSpy = spyOn(globalThis, "fetch");
+	});
+
+	afterEach(() => {
+		mock.restore();
+		clearEnv();
+	});
+
+	test("sends POST with correct body structure", async () => {
+		fetchSpy.mockResolvedValue(jsonResponse({ id: 1 }));
+
+		const finding = makeFinding({
+			filePath: "src/app.ts",
+			startLine: 10,
+			endLine: 15,
+			severity: "warning",
+			title: "Test issue",
+			message: "Test message",
+			fingerprint: "fp123",
+		});
+		const file = makeFile({ path: "src/app.ts", changeTrackingId: 100 });
+
+		await createThread(finding, file, { current: 2, previous: 1 });
+
+		const callInit = fetchSpy.mock.calls[0][1] as RequestInit;
+		expect(callInit.method).toBe("POST");
+
+		const body = JSON.parse(callInit.body as string);
+		expect(body.status).toBe(1);
+		expect(body.threadContext.filePath).toBe("src/app.ts");
+		expect(body.threadContext.rightFileStart.line).toBe(10);
+		expect(body.threadContext.rightFileEnd.line).toBe(15);
+		expect(body.pullRequestThreadContext.changeTrackingId).toBe(100);
+		expect(body.pullRequestThreadContext.iterationContext).toEqual({
+			firstComparingIteration: 1,
+			secondComparingIteration: 2,
+		});
+	});
+
+	test("includes suggestion code fence when finding has suggestion", async () => {
+		fetchSpy.mockResolvedValue(jsonResponse({ id: 1 }));
+
+		const finding = makeFinding({
+			suggestion: "const x = 1;",
+		});
+
+		await createThread(finding, makeFile(), { current: 1, previous: 0 });
+
+		const body = JSON.parse(
+			(fetchSpy.mock.calls[0][1] as RequestInit).body as string,
+		);
+		const content = body.comments[0].content as string;
+		expect(content).toContain("```suggestion");
+		expect(content).toContain("const x = 1;");
+	});
+
+	test("omits suggestion code fence when no suggestion", async () => {
+		fetchSpy.mockResolvedValue(jsonResponse({ id: 1 }));
+
+		const finding = makeFinding({ suggestion: undefined });
+
+		await createThread(finding, makeFile(), { current: 1, previous: 0 });
+
+		const body = JSON.parse(
+			(fetchSpy.mock.calls[0][1] as RequestInit).body as string,
+		);
+		const content = body.comments[0].content as string;
+		expect(content).not.toContain("```suggestion");
+	});
+
+	test("includes bot marker and fingerprint in comment", async () => {
+		fetchSpy.mockResolvedValue(jsonResponse({ id: 1 }));
+
+		const finding = makeFinding({ fingerprint: "myfingerprint" });
+
+		await createThread(finding, makeFile(), { current: 1, previous: 0 });
+
+		const body = JSON.parse(
+			(fetchSpy.mock.calls[0][1] as RequestInit).body as string,
+		);
+		const content = body.comments[0].content as string;
+		expect(content).toContain("<!-- copilot-pr-reviewer-bot -->");
+		expect(content).toContain("<!-- fingerprint:myfingerprint -->");
+	});
+
+	test("uses 1 for firstComparingIteration when previous is 0", async () => {
+		fetchSpy.mockResolvedValue(jsonResponse({ id: 1 }));
+
+		await createThread(makeFinding(), makeFile(), {
+			current: 1,
+			previous: 0,
+		});
+
+		const body = JSON.parse(
+			(fetchSpy.mock.calls[0][1] as RequestInit).body as string,
+		);
+		expect(
+			body.pullRequestThreadContext.iterationContext.firstComparingIteration,
+		).toBe(1);
+	});
+});
+
+describe("resolveThread", () => {
+	let fetchSpy: ReturnType<typeof spyOn>;
+
+	beforeEach(() => {
+		setEnv();
+		fetchSpy = spyOn(globalThis, "fetch");
+	});
+
+	afterEach(() => {
+		mock.restore();
+		clearEnv();
+	});
+
+	test("sends PATCH with status 2", async () => {
+		fetchSpy.mockResolvedValue(jsonResponse({}));
+
+		await resolveThread(42);
+
+		const callUrl = fetchSpy.mock.calls[0][0] as string;
+		expect(callUrl).toContain("/threads/42");
+
+		const callInit = fetchSpy.mock.calls[0][1] as RequestInit;
+		expect(callInit.method).toBe("PATCH");
+
+		const body = JSON.parse(callInit.body as string);
+		expect(body.status).toBe(2);
+	});
+});
+
+describe("adoFetch error handling", () => {
+	let fetchSpy: ReturnType<typeof spyOn>;
+	let sleepSpy: ReturnType<typeof spyOn>;
+
+	beforeEach(() => {
+		setEnv();
+		fetchSpy = spyOn(globalThis, "fetch");
+		sleepSpy = spyOn(Bun, "sleep").mockResolvedValue(undefined as never);
+	});
+
+	afterEach(() => {
+		mock.restore();
+		clearEnv();
+	});
+
+	test("throws on 401 with auth error message", async () => {
+		fetchSpy.mockResolvedValue(errorResponse(401, "Unauthorized"));
+
+		await expect(resolveThread(1)).rejects.toThrow("ADO auth failed (401)");
+	});
+
+	test("retries on 429 and succeeds", async () => {
+		let callCount = 0;
+		fetchSpy.mockImplementation(() => {
+			callCount++;
+			if (callCount <= 1) {
+				return Promise.resolve(
+					errorResponse(429, "Too Many Requests", { "Retry-After": "1" }),
+				);
+			}
+			return Promise.resolve(jsonResponse({}));
+		});
+
+		await resolveThread(1);
+
+		expect(sleepSpy).toHaveBeenCalledWith(1000);
+	});
+
+	test("throws after max retries on repeated 429", async () => {
+		fetchSpy.mockResolvedValue(
+			errorResponse(429, "Too Many Requests", { "Retry-After": "1" }),
+		);
+
+		await expect(resolveThread(1)).rejects.toThrow(
+			"ADO API rate limit exceeded after max retries",
+		);
+	});
+
+	test("throws on 500 with status text", async () => {
+		fetchSpy.mockResolvedValue(errorResponse(500, "Internal Server Error"));
+
+		await expect(resolveThread(1)).rejects.toThrow(
+			"ADO API error: 500 Internal Server Error",
+		);
+	});
+
+	test("uses default Retry-After of 5 when header missing", async () => {
+		let callCount = 0;
+		fetchSpy.mockImplementation(() => {
+			callCount++;
+			if (callCount <= 1) {
+				return Promise.resolve(errorResponse(429, "Too Many Requests"));
+			}
+			return Promise.resolve(jsonResponse({}));
+		});
+
+		await resolveThread(1);
+
+		expect(sleepSpy).toHaveBeenCalledWith(5000);
+	});
+});
