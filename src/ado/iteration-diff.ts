@@ -43,8 +43,12 @@ export async function fetchIncrementalChanges(
   ).map((i) => i.id);
   if (iterations.length === 0) return [];
 
-  const current = Math.max(...iterations);
-  const previous = current > 1 ? current - 1 : 0;
+  const sortedIterations = [...iterations].sort((a, b) => a - b);
+  const current = sortedIterations[sortedIterations.length - 1];
+  const previous =
+    sortedIterations.length > 1
+      ? sortedIterations[sortedIterations.length - 2]
+      : 0;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const changes = await client.request<any>(
@@ -83,7 +87,7 @@ export async function fetchIncrementalChanges(
       currentIteration: current,
       previousIteration: previous,
       riskLevel: classifyRisk(normalizedPath, config.securityOverrides),
-      testStatus: detectTestStatus(normalizedPath, allPaths),
+      testStatus: detectTestStatus(normalizedPath, allPaths, env.repoRoot),
     });
   }
 
