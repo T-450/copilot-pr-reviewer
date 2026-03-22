@@ -1,4 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { approveAll } from "@github/copilot-sdk";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -16,7 +17,47 @@ import {
 	createHooks,
 } from "../src/hooks.ts";
 import { loadConfig } from "../src/config.ts";
+import {
+	buildSessionConfig,
+	type SessionConfigInputs,
+} from "../src/session.ts";
+import type { PRMetadata } from "../src/ado/client.ts";
+import type { Config } from "../src/config.ts";
 import type { Finding } from "../src/types.ts";
+
+// ── Shared fixtures for session config tests ─────────────────────────────────
+
+const defaultConfig: Config = {
+	ignore: [],
+	severityThreshold: "suggestion",
+	maxFiles: 30,
+	planning: true,
+	clustering: true,
+	clusterThreshold: 3,
+	reasoningEffort: "low",
+};
+
+const samplePR: PRMetadata = {
+	title: "Test PR",
+	description: "Test description",
+	workItemIds: [],
+};
+
+function makeInputs(
+	overrides: Partial<SessionConfigInputs> = {},
+): SessionConfigInputs {
+	const findings: Finding[] = [];
+	return {
+		repoId: "repo-1",
+		prId: "42",
+		iteration: 1,
+		pr: samplePR,
+		config: defaultConfig,
+		tools: [createEmitFindingTool(findings)],
+		repoRoot: "/tmp/test-repo",
+		...overrides,
+	};
+}
 
 // ── Shared test helpers ─────────────────────────────────────────────────────
 
@@ -725,5 +766,161 @@ describe("createHooks() aggregation", () => {
 			hookInv,
 		);
 		expect(endResult).toBeDefined();
+	});
+});
+
+// ── Session config — infiniteSessions ────────────────────────────────────────
+
+describe("session config — infiniteSessions", () => {
+	test("infiniteSessions is enabled by default", () => {
+		const cfg = buildSessionConfig(makeInputs());
+		// biome-ignore lint/suspicious/noExplicitAny: accessing SDK config property
+		const inf = (cfg as any).infiniteSessions;
+
+		expect(inf).toBeDefined();
+		expect(inf.enabled).toBe(true);
+	});
+
+	test("backgroundCompactionThreshold is set to 0.85", () => {
+		const cfg = buildSessionConfig(makeInputs());
+		// biome-ignore lint/suspicious/noExplicitAny: accessing SDK config property
+		const inf = (cfg as any).infiniteSessions;
+
+		expect(inf.backgroundCompactionThreshold).toBe(0.85);
+	});
+
+	test("bufferExhaustionThreshold is set to 0.7", () => {
+		const cfg = buildSessionConfig(makeInputs());
+		// biome-ignore lint/suspicious/noExplicitAny: accessing SDK config property
+		const inf = (cfg as any).infiniteSessions;
+
+		expect(inf.bufferExhaustionThreshold).toBe(0.7);
+	});
+});
+
+// ── Session config — systemMessage ───────────────────────────────────────────
+
+describe("session config — systemMessage", () => {
+	test("systemMessage mode is 'append'", () => {
+		const cfg = buildSessionConfig(makeInputs());
+		const msg = cfg.systemMessage as { content: string; mode: string };
+
+		expect(msg.mode).toBe("append");
+	});
+
+	test("systemMessage content includes review instructions", () => {
+		const cfg = buildSessionConfig(makeInputs());
+		const msg = cfg.systemMessage as { content: string; mode: string };
+
+		expect(msg.content).toContain("emit_finding");
+		expect(msg.content).toContain("Review Contract");
+	});
+
+	test("systemMessage content reflects PR metadata", () => {
+		const pr = {
+			title: "My Custom PR",
+			description: "Custom desc",
+			workItemIds: [999],
+		};
+		const cfg = buildSessionConfig(makeInputs({ pr }));
+		const msg = cfg.systemMessage as { content: string; mode: string };
+
+		expect(msg.content).toContain("My Custom PR");
+		expect(msg.content).toContain("Custom desc");
+		expect(msg.content).toContain("999");
+	});
+});
+
+// ── Session config — onPermissionRequest ─────────────────────────────────────
+
+describe("session config — onPermissionRequest", () => {
+	test("onPermissionRequest is set to approveAll", () => {
+		const cfg = buildSessionConfig(makeInputs());
+
+		expect(cfg.onPermissionRequest).toBe(approveAll);
+	});
+});
+
+// ── Session config — instruction config integration ──────────────────────────
+
+describe("session config — instruction config integration", () => {
+	test("skillDirectories flows into session config as empty array", () => {
+		const cfg = buildSessionConfig(makeInputs());
+		// biome-ignore lint/suspicious/noExplicitAny: accessing instruction config property
+		const sessionAny = cfg as any;
+
+		expect(sessionAny.skillDirectories).toEqual([]);
+	});
+
+	test("disabledSkills flows into session config as empty array", () => {
+		const cfg = buildSessionConfig(makeInputs());
+		// biome-ignore lint/suspicious/noExplicitAny: accessing instruction config property
+		const sessionAny = cfg as any;
+
+		expect(sessionAny.disabledSkills).toEqual([]);
+	});
+});
+
+// ── Session config — all reasoningEffort values ──────────────────────────────
+
+describe("session config — reasoningEffort propagation", () => {
+	test("'low' flows through to session config", () => {
+		const cfg = buildSessionConfig(
+			makeInputs({ config: { ...defaultConfig, reasoningEffort: "low" } }),
+		);
+		expect(cfg.reasoningEffort).toBe("low");
+	});
+
+	test("'medium' flows through to session config", () => {
+		const cfg = buildSessionConfig(
+			makeInputs({ config: { ...defaultConfig, reasoningEffort: "medium" } }),
+		);
+		expect(cfg.reasoningEffort).toBe("medium");
+	});
+
+	test("'high' flows through to session config", () => {
+		const cfg = buildSessionConfig(
+			makeInputs({ config: { ...defaultConfig, reasoningEffort: "high" } }),
+		);
+		expect(cfg.reasoningEffort).toBe("high");
+	});
+
+	test("'xhigh' flows through to session config", () => {
+		const cfg = buildSessionConfig(
+			makeInputs({ config: { ...defaultConfig, reasoningEffort: "xhigh" } }),
+		);
+		expect(cfg.reasoningEffort).toBe("xhigh");
+	});
+});
+
+// ── Session config — model selection via COPILOT_MODEL env var ───────────────
+
+describe("session config — model env var fallback", () => {
+	test("uses COPILOT_MODEL env var when set and no override", () => {
+		const original = process.env.COPILOT_MODEL;
+		process.env.COPILOT_MODEL = "gpt-4o-mini";
+
+		const cfg = buildSessionConfig(makeInputs());
+		expect(cfg.model).toBe("gpt-4o-mini");
+
+		if (original !== undefined) {
+			process.env.COPILOT_MODEL = original;
+		} else {
+			delete process.env.COPILOT_MODEL;
+		}
+	});
+
+	test("explicit model input takes precedence over env var", () => {
+		const original = process.env.COPILOT_MODEL;
+		process.env.COPILOT_MODEL = "gpt-4o-mini";
+
+		const cfg = buildSessionConfig(makeInputs({ model: "o3-mini" }));
+		expect(cfg.model).toBe("o3-mini");
+
+		if (original !== undefined) {
+			process.env.COPILOT_MODEL = original;
+		} else {
+			delete process.env.COPILOT_MODEL;
+		}
 	});
 });

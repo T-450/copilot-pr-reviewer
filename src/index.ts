@@ -1,4 +1,4 @@
-import { CopilotClient, type SessionEvent } from "@github/copilot-sdk";
+import { CopilotClient } from "@github/copilot-sdk";
 import { loadConfig, meetsThreshold } from "./config.ts";
 import {
 	fetchPRMetadata,
@@ -18,30 +18,11 @@ import { configureBundledInstructionDirs } from "./instructions.ts";
 import { clusterFindings } from "./cluster.ts";
 import { CHANGE_TYPE_LABELS, type Finding } from "./types.ts";
 import { buildSessionConfig } from "./session.ts";
+import { createStreamingHandler } from "./streaming.ts";
 
 const REVIEW_TIMEOUT = 120_000;
 const PLANNING_TIMEOUT = 30_000;
 const THREAD_ACTION_DELAY_MS = 500;
-
-function createStreamingHandler(): (event: SessionEvent) => void {
-	return (event) => {
-		switch (event.type) {
-			case "assistant.message_delta":
-				process.stdout.write(".");
-				break;
-			case "assistant.message":
-				process.stdout.write("\n");
-				break;
-			case "session.error":
-				console.error(
-					`  [stream error] ${(event as { data: { message: string } }).data.message}`,
-				);
-				break;
-			case "session.idle":
-				break;
-		}
-	};
-}
 
 async function main(): Promise<void> {
 	const configPath = process.env.CONFIG_PATH ?? ".prreviewer.yml";
