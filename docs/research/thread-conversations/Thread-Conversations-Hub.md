@@ -12,6 +12,7 @@ related:
   - "[[ADO-Thread-Reply-API-Shape]]"
   - "[[Same-Thread-Reply-Prototype-Plan]]"
   - "[[Phase-01-Same-Thread-Reply-Prototype-Validation-Report]]"
+  - "[[Thread-Conversation-Memory-Model]]"
   - "[[Production-Reply-Loop-Orchestration-Order]]"
   - "[[Phase-02-Production-Reply-Loop-Validation-Report]]"
   - "[[Copilot-SDK-Foundation-Implementation-Summary]]"
@@ -27,6 +28,7 @@ This hub links the Phase 01 research needed to add same-thread conversational re
 - [[ADO-Thread-Reply-API-Shape]] - minimum Azure DevOps thread payload extensions needed for conversational reply detection.
 - [[Same-Thread-Reply-Prototype-Plan]] - smallest runnable prototype that proves reply generation works without changing the production pipeline.
 - [[Phase-01-Same-Thread-Reply-Prototype-Validation-Report]] - validation status, commands run, working prototype evidence, and the final Phase 01 closure result.
+- [[Thread-Conversation-Memory-Model]] - Phase 03 decision note defining what per-thread memory must be preserved and why thread metadata is preferred over external persistence.
 - [[Production-Reply-Loop-Orchestration-Order]] - Phase 02 execution order for placing live reply handling alongside planning, reconcile, thread mutation, and feedback collection.
 - [[Phase-02-Production-Reply-Loop-Validation-Report]] - production reply-loop readiness, full test evidence, prototype revalidation, and current known limits.
 
