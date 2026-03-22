@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import type { MessageOptions } from "@github/copilot-sdk";
-import type { ReplyCandidateThread } from "./ado/client.ts";
+import type { ReplyCandidateThread } from "./thread-context.ts";
 import { buildReplyRequest } from "./review.ts";
 
 export const REPLY_TIMEOUT = 120_000;

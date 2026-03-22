@@ -232,7 +232,7 @@ function formatThreadBody(finding: Finding): string {
 		"",
 		finding.message,
 	];
-	//Note:azure devops automatically detects suggestion code fence and implement a "Apply change" button in the pr ui
+	// Azure DevOps renders ```suggestion fences as "Apply change" actions.
 	if (finding.suggestion) {
 		lines.push(
 			"",

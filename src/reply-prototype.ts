@@ -10,6 +10,7 @@ import { createHooks } from "./hooks.ts";
 import { configureBundledInstructionDirs } from "./instructions.ts";
 import { extractAssistantText } from "./reply-loop.ts";
 import { buildReplyRequest } from "./review.ts";
+import { getReplySystemPrompt } from "./session.ts";
 import {
 	buildReplyCandidateThread,
 	type RawAdoThread,
@@ -298,8 +299,7 @@ async function createPrototypeResponder(
 		],
 		hooks: createHooks(),
 		systemMessage: {
-			content:
-				"You are continuing an existing Azure DevOps PR review thread. Reply directly to the latest user follow-up and return only the reply text.",
+			content: getReplySystemPrompt(),
 			mode: "append",
 		},
 		onPermissionRequest: approveAll,

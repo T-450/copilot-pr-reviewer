@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ReplyCandidateThread } from "../src/ado/client.ts";
+import type { ReplyCandidateThread } from "../src/thread-context.ts";
 import {
 	extractAssistantText,
 	MAX_REPLIES_PER_RUN,
