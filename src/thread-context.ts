@@ -27,23 +27,14 @@ export type ThreadComment = {
 	readonly replyToCommentId: number | null;
 };
 
-export type ThreadReplyCheckpoint = {
-	readonly commentId: number;
-	readonly answeredCommentId: number | null;
-	readonly publishedDate: string;
-};
-
 export type ReplyCandidateThread = {
 	readonly id: number;
 	readonly filePath: string;
 	readonly fingerprint: string;
 	readonly status: number;
 	readonly rootBotCommentId: number;
-	readonly botAuthorId: string;
 	readonly findingSummary: string;
 	readonly comments: readonly ThreadComment[];
-	readonly latestBotReplyAt: string;
-	readonly latestBotCheckpoint: ThreadReplyCheckpoint | null;
 	readonly latestUserFollowUp: ThreadComment | null;
 	readonly answeredCommentIds: readonly number[];
 };
@@ -198,16 +189,6 @@ export function buildReplyCandidateThread(
 		comments.find((comment) => comment.id === rootCommentId)?.body ||
 		"Original finding summary unavailable.";
 
-	const latestBotReplyAt = comments
-		.filter((comment) => comment.isBot)
-		.reduce(
-			(latest, comment) =>
-				parseTimestamp(comment.publishedDate) > parseTimestamp(latest)
-					? comment.publishedDate
-					: latest,
-			rootBotComment.publishedDate ?? "",
-		);
-
 	const checkpoints = comments
 		.filter((comment) => comment.isBot)
 		.map((comment) => ({
@@ -222,10 +203,6 @@ export function buildReplyCandidateThread(
 				left.commentId - right.commentId
 			);
 		});
-	const latestBotCheckpoint =
-		checkpoints.findLast(
-			(checkpoint) => checkpoint.answeredCommentId !== null,
-		) ?? null;
 	const answeredCommentIds = [
 		...new Set(
 			checkpoints
@@ -244,11 +221,8 @@ export function buildReplyCandidateThread(
 		fingerprint,
 		status: thread.status,
 		rootBotCommentId: rootCommentId,
-		botAuthorId,
 		findingSummary,
 		comments,
-		latestBotReplyAt,
-		latestBotCheckpoint,
 		latestUserFollowUp,
 		answeredCommentIds,
 	};

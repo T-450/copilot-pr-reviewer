@@ -38,11 +38,8 @@ const sampleReplyThread: ReplyCandidateThread = {
 	fingerprint: "fp-123",
 	status: 1,
 	rootBotCommentId: 10,
-	botAuthorId: "bot-1",
 	findingSummary:
 		"🟡 **WARNING** — Null branch can bypass the guard\n\nThe fallback path can still dereference `session.user` after logout.",
-	latestBotReplyAt: "2026-03-22T12:03:00.000Z",
-	latestBotCheckpoint: null,
 	answeredCommentIds: [],
 	latestUserFollowUp: {
 		id: 30,

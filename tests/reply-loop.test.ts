@@ -16,11 +16,8 @@ function makeThread(
 		fingerprint: overrides.fingerprint ?? "fp-1",
 		status: overrides.status ?? 1,
 		rootBotCommentId: overrides.rootBotCommentId ?? 100,
-		botAuthorId: overrides.botAuthorId ?? "bot-1",
 		findingSummary:
 			overrides.findingSummary ?? "Original finding summary unavailable.",
-		latestBotReplyAt: overrides.latestBotReplyAt ?? "2026-03-22T12:00:00.000Z",
-		latestBotCheckpoint: overrides.latestBotCheckpoint ?? null,
 		answeredCommentIds: overrides.answeredCommentIds ?? [],
 		latestUserFollowUp:
 			overrides.latestUserFollowUp === undefined

@@ -760,8 +760,6 @@ describe("listReplyCandidateThreads", () => {
 		expect(result).toHaveLength(1);
 		expect(thread.fingerprint).toBe("fp-reply");
 		expect(thread.rootBotCommentId).toBe(10);
-		expect(thread.botAuthorId).toBe("bot-1");
-		expect(thread.latestBotReplyAt).toBe("2026-03-22T12:03:00.000Z");
 		expect(thread.comments.map((comment) => comment.id)).toEqual([
 			10, 20, 25, 30,
 		]);

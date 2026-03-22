@@ -119,11 +119,6 @@ describe("buildReplyCandidateThread", () => {
 			"Null branch can bypass the guard",
 		);
 		expect(thread?.answeredCommentIds).toEqual([20]);
-		expect(thread?.latestBotCheckpoint).toEqual({
-			commentId: 25,
-			answeredCommentId: 20,
-			publishedDate: "2026-03-22T12:03:00.000Z",
-		});
 		expect(thread?.latestUserFollowUp?.id).toBe(30);
 		expect(thread?.latestUserFollowUp?.role).toBe("user");
 	});

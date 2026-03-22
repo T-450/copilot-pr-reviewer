@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { extractAssistantText } from "../src/reply-loop.ts";
 import {
-	extractAssistantText,
 	formatReplyPrototypeReport,
 	prepareReplyPrototype,
 	runReplyPrototypeFlow,

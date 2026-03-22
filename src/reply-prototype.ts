@@ -17,8 +17,6 @@ import {
 	type ReplyCandidateThread,
 } from "./thread-context.ts";
 
-export { extractAssistantText } from "./reply-loop.ts";
-
 const REPLY_TIMEOUT = 60_000;
 const SAMPLE_FILE_PATH = "src/auth.ts";
 
