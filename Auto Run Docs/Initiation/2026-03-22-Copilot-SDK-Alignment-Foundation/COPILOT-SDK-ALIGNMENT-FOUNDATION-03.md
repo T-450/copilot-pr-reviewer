@@ -26,10 +26,11 @@ This phase replaces the current inline sub-agent setup with the nearest verified
   - Add code comments only where the supported SDK behavior is non-obvious and future maintainers would otherwise misread it
   - **Done:** Extracted `buildSessionConfig()` into `src/session.ts` as a pure, testable function. Session creation in `index.ts` now delegates to this function, making agent registration, tool scoping, and excluded-tool lists independently verifiable without a live SDK. Added inference-dispatch comments in both session.ts and the per-file review loop. All 209 tests pass, typecheck clean.
 
-- [ ] Add focused tests for scoped specialist behavior:
+- [x] Add focused tests for scoped specialist behavior:
   - Cover specialist registration, selection, allowed-tool scope, and fallback behavior when a specialist is unavailable
   - Keep these tests separate from the production refactor and reuse existing SDK integration patterns where possible
   - Add at least one regression test proving the main reviewer still works when specialist logic is disabled or bypassed
+  - **Done:** Added `tests/specialist-agents.test.ts` with 28 focused tests across 7 describe blocks: specialist registration (6 tests), allowed-tool scope (6 tests), session-level exclusion (3 tests), fallback/override behavior (5 tests including empty-agents regression), session identity/model wiring (6 tests), and specialist+session exclusion coherence (2 tests). All 237 tests pass, typecheck clean.
 
 - [ ] Run specialist migration validation and update the knowledge artifacts:
   - Execute the targeted tests for agent configuration and orchestration
