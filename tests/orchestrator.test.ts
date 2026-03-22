@@ -1,5 +1,6 @@
 import { describe, expect, test, spyOn, mock, afterEach } from "bun:test";
 import { createStreamingHandler } from "../src/streaming.ts";
+import type { SessionEvent } from "@github/copilot-sdk";
 import { meetsThreshold } from "../src/config.ts";
 import { clusterFindings } from "../src/cluster.ts";
 import {
@@ -54,14 +55,15 @@ describe("createStreamingHandler — streaming progress handling", () => {
 	});
 
 	test("logs error with message on session.error", () => {
-		const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+		const errorSpy = spyOn(console, "error").mockImplementation(() => {
+			/* noop */
+		});
 		const handler = createStreamingHandler();
 
-		// biome-ignore lint/suspicious/noExplicitAny: testing with error event shape
 		handler({
 			type: "session.error",
 			data: { message: "Rate limit hit" },
-		} as any);
+		} as unknown as SessionEvent);
 
 		expect(errorSpy).toHaveBeenCalledTimes(1);
 		const logged = errorSpy.mock.calls[0][0] as string;
@@ -71,7 +73,9 @@ describe("createStreamingHandler — streaming progress handling", () => {
 
 	test("does not write or log on session.idle", () => {
 		const writeSpy = spyOn(process.stdout, "write").mockReturnValue(true);
-		const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+		const errorSpy = spyOn(console, "error").mockImplementation(() => {
+			/* noop */
+		});
 		const handler = createStreamingHandler();
 
 		// biome-ignore lint/suspicious/noExplicitAny: testing with minimal SessionEvent shape
@@ -83,7 +87,9 @@ describe("createStreamingHandler — streaming progress handling", () => {
 
 	test("handles unknown event types gracefully without crashing", () => {
 		const writeSpy = spyOn(process.stdout, "write").mockReturnValue(true);
-		const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+		const errorSpy = spyOn(console, "error").mockImplementation(() => {
+			/* noop */
+		});
 		const handler = createStreamingHandler();
 
 		// biome-ignore lint/suspicious/noExplicitAny: testing unknown event type

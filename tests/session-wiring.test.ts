@@ -573,7 +573,6 @@ describe("hook wiring — onUserPromptSubmitted guard", () => {
 
 	test("suppresses null prompt without throwing", () => {
 		const hook = createUserPromptSubmittedHook();
-		// biome-ignore lint: testing runtime null guard
 		const result = hook(
 			{ timestamp: Date.now(), cwd: "/tmp", prompt: null as unknown as string },
 			hookInv,
@@ -583,7 +582,6 @@ describe("hook wiring — onUserPromptSubmitted guard", () => {
 
 	test("suppresses undefined prompt without throwing", () => {
 		const hook = createUserPromptSubmittedHook();
-		// biome-ignore lint: testing runtime undefined guard
 		const result = hook(
 			{
 				timestamp: Date.now(),
@@ -710,7 +708,7 @@ describe("createHooks() aggregation", () => {
 		const hookInv = { sessionId: "wiring-test" };
 
 		// PreToolUse denies write_file
-		const preResult = hooks.onPreToolUse!(
+		const preResult = hooks.onPreToolUse?.(
 			{
 				timestamp: Date.now(),
 				cwd: "/tmp",
@@ -722,7 +720,7 @@ describe("createHooks() aggregation", () => {
 		expect(preResult).toBeDefined();
 
 		// PreToolUse allows read_file
-		const allowResult = hooks.onPreToolUse!(
+		const allowResult = hooks.onPreToolUse?.(
 			{
 				timestamp: Date.now(),
 				cwd: "/tmp",
@@ -734,14 +732,14 @@ describe("createHooks() aggregation", () => {
 		expect(allowResult).toBeUndefined();
 
 		// UserPromptSubmitted allows valid prompt
-		const promptResult = hooks.onUserPromptSubmitted!(
+		const promptResult = hooks.onUserPromptSubmitted?.(
 			{ timestamp: Date.now(), cwd: "/tmp", prompt: "Review this" },
 			hookInv,
 		);
 		expect(promptResult).toBeUndefined();
 
 		// ErrorOccurred retries model errors
-		const errorResult = await hooks.onErrorOccurred!(
+		const errorResult = await hooks.onErrorOccurred?.(
 			{
 				timestamp: Date.now(),
 				cwd: "/tmp",
@@ -754,14 +752,14 @@ describe("createHooks() aggregation", () => {
 		expect(errorResult).toBeDefined();
 
 		// SessionStart returns context
-		const startResult = await hooks.onSessionStart!(
+		const startResult = await hooks.onSessionStart?.(
 			{ timestamp: Date.now(), cwd: "/tmp", source: "new" },
 			hookInv,
 		);
 		expect(startResult).toBeDefined();
 
 		// SessionEnd returns summary
-		const endResult = await hooks.onSessionEnd!(
+		const endResult = await hooks.onSessionEnd?.(
 			{ timestamp: Date.now(), cwd: "/tmp", reason: "complete" },
 			hookInv,
 		);
@@ -906,7 +904,7 @@ describe("session config — model env var fallback", () => {
 		if (original !== undefined) {
 			process.env.COPILOT_MODEL = original;
 		} else {
-			delete process.env.COPILOT_MODEL;
+			process.env.COPILOT_MODEL = undefined;
 		}
 	});
 
@@ -920,7 +918,7 @@ describe("session config — model env var fallback", () => {
 		if (original !== undefined) {
 			process.env.COPILOT_MODEL = original;
 		} else {
-			delete process.env.COPILOT_MODEL;
+			process.env.COPILOT_MODEL = undefined;
 		}
 	});
 });

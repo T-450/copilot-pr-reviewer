@@ -70,30 +70,33 @@ export type SessionHooks = {
 	onPreToolUse?: (
 		input: PreToolUseInput,
 		inv: Invocation,
-	) => Promise<PreToolUseOutput | void> | PreToolUseOutput | void;
+	) => Promise<PreToolUseOutput | undefined> | PreToolUseOutput | undefined;
 	onPostToolUse?: (
 		input: PostToolUseInput,
 		inv: Invocation,
-	) => Promise<PostToolUseOutput | void> | PostToolUseOutput | void;
+	) => Promise<PostToolUseOutput | undefined> | PostToolUseOutput | undefined;
 	onUserPromptSubmitted?: (
 		input: UserPromptSubmittedInput,
 		inv: Invocation,
 	) =>
-		| Promise<UserPromptSubmittedOutput | void>
+		| Promise<UserPromptSubmittedOutput | undefined>
 		| UserPromptSubmittedOutput
-		| void;
+		| undefined;
 	onErrorOccurred?: (
 		input: ErrorOccurredInput,
 		inv: Invocation,
-	) => Promise<ErrorOccurredOutput | void> | ErrorOccurredOutput | void;
+	) =>
+		| Promise<ErrorOccurredOutput | undefined>
+		| ErrorOccurredOutput
+		| undefined;
 	onSessionEnd?: (
 		input: SessionEndInput,
 		inv: Invocation,
-	) => Promise<SessionEndOutput | void> | SessionEndOutput | void;
+	) => Promise<SessionEndOutput | undefined> | SessionEndOutput | undefined;
 	onSessionStart?: (
 		input: SessionStartInput,
 		inv: Invocation,
-	) => Promise<SessionStartOutput | void> | SessionStartOutput | void;
+	) => Promise<SessionStartOutput | undefined> | SessionStartOutput | undefined;
 };
 
 const SOURCE_EXTS = new Set([

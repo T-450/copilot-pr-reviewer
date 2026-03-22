@@ -163,7 +163,7 @@ describe("createEmitFindingTool", () => {
 				title: "Test",
 				message: "Test message",
 				confidence: "high",
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// biome-ignore lint/suspicious/noExplicitAny: testing incomplete finding shape
 			} as any,
 			{
 				sessionId: "test",
@@ -215,10 +215,12 @@ describe("buildFileReviewRequest", () => {
 	test("attachment has type 'file' and correct absolute path", () => {
 		const absPath = "/home/user/repo/src/auth.ts";
 		const request = buildFileReviewRequest("src/auth.ts", "edit", absPath);
-		const attachment = request.attachments![0];
-
-		expect(attachment.type).toBe("file");
-		expect(attachment.type === "file" && attachment.path).toBe(absPath);
+		const att = request.attachments?.[0];
+		expect(att).toBeDefined();
+		expect(att?.type).toBe("file");
+		if (att?.type === "file") {
+			expect(att.path).toBe(absPath);
+		}
 	});
 
 	test("attachment path is absolute, not relative", () => {
@@ -227,11 +229,11 @@ describe("buildFileReviewRequest", () => {
 			"edit",
 			"/absolute/path/src/auth.ts",
 		);
-		const attachment = request.attachments![0];
-
-		expect(attachment.type === "file" && attachment.path.startsWith("/")).toBe(
-			true,
-		);
+		const att = request.attachments?.[0];
+		expect(att).toBeDefined();
+		if (att?.type === "file") {
+			expect(att.path.startsWith("/")).toBe(true);
+		}
 	});
 
 	test("prompt does not embed file content (attachment-first invariant)", () => {

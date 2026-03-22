@@ -337,7 +337,7 @@ export function reconcile(
 		)
 		.map((finding) => ({
 			finding,
-			file: fileByPath.get(finding.filePath)!,
+			file: fileByPath.get(finding.filePath) as ChangedFile,
 		}));
 
 	const toResolve = existingThreads

@@ -94,7 +94,10 @@ describe.skipIf(!HAS_TOKEN)("E2E orchestrator flow", () => {
 	});
 
 	afterAll(async () => {
-		if (client) await client.stop().catch(() => {});
+		if (client)
+			await client.stop().catch(() => {
+				/* cleanup */
+			});
 		if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
 	});
 

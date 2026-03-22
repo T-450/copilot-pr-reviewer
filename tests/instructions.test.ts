@@ -11,7 +11,7 @@ const ORIGINAL_DIRS = process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS;
 
 afterEach(() => {
 	if (ORIGINAL_DIRS === undefined) {
-		delete process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS;
+		process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS = undefined;
 		return;
 	}
 
@@ -100,7 +100,7 @@ describe("buildSessionInstructionConfig", () => {
 
 describe("configureBundledInstructionDirs — regression", () => {
 	test("sets COPILOT_CUSTOM_INSTRUCTIONS_DIRS env var", () => {
-		delete process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS;
+		process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS = undefined;
 		configureBundledInstructionDirs();
 
 		expect(process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBeDefined();
@@ -133,7 +133,7 @@ describe("configureBundledInstructionDirs — regression", () => {
 	});
 
 	test("works when env var is initially unset", () => {
-		delete process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS;
+		process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS = undefined;
 		const dirs = configureBundledInstructionDirs();
 
 		expect(dirs).toContain(getBundledInstructionRoot());

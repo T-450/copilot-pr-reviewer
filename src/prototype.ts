@@ -154,7 +154,7 @@ function printFindingsSummary(
 		meetsThreshold(f.severity, config.severityThreshold),
 	);
 
-	console.log("\n" + "=".repeat(60));
+	console.log(`\n${"=".repeat(60)}`);
 	console.log("  PROTOTYPE REVIEW SUMMARY");
 	console.log("=".repeat(60));
 	console.log(`  Total findings:     ${findings.length}`);
@@ -171,7 +171,7 @@ function printFindingsSummary(
 
 	if (reportable.length > 0) {
 		console.log("\n  Findings:");
-		console.log("  " + "-".repeat(56));
+		console.log(`  ${"-".repeat(56)}`);
 		for (const f of reportable) {
 			const icon = SEVERITY_ICON[f.severity] ?? "[????]";
 			console.log(`  ${icon} ${f.title}`);

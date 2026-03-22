@@ -110,6 +110,7 @@ describe("specialist allowed-tool scope", () => {
 	test("security-reviewer tools match SPECIALIST_TOOLS", () => {
 		const cfg = buildSessionConfig(makeInputs());
 		const agents = cfg.customAgents as CustomAgentConfig[];
+		// biome-ignore lint/style/noNonNullAssertion: guarded by customAgents contract
 		const security = agents.find((a) => a.name === "security-reviewer")!;
 
 		expect(security.tools).toEqual([...SPECIALIST_TOOLS]);
@@ -118,6 +119,7 @@ describe("specialist allowed-tool scope", () => {
 	test("test-reviewer tools match SPECIALIST_TOOLS", () => {
 		const cfg = buildSessionConfig(makeInputs());
 		const agents = cfg.customAgents as CustomAgentConfig[];
+		// biome-ignore lint/style/noNonNullAssertion: guarded by customAgents contract
 		const testAgent = agents.find((a) => a.name === "test-reviewer")!;
 
 		expect(testAgent.tools).toEqual([...SPECIALIST_TOOLS]);
@@ -179,6 +181,7 @@ describe("session-level excluded tools", () => {
 		const cfg1 = buildSessionConfig(makeInputs());
 		const cfg2 = buildSessionConfig(makeInputs());
 		expect(cfg1.excludedTools).not.toBe(cfg2.excludedTools);
+		// biome-ignore lint/style/noNonNullAssertion: narrowed by prior not.toBe assertion
 		expect(cfg1.excludedTools).toEqual(cfg2.excludedTools!);
 	});
 });
@@ -238,6 +241,7 @@ describe("specialist fallback and override behavior", () => {
 		const cfg2 = buildSessionConfig(makeInputs());
 
 		expect(cfg1.customAgents).not.toBe(cfg2.customAgents);
+		// biome-ignore lint/style/noNonNullAssertion: narrowed by prior not.toBe assertion
 		expect(cfg1.customAgents).toEqual(cfg2.customAgents!);
 	});
 });
@@ -254,7 +258,7 @@ describe("session config identity and model", () => {
 
 	test("model defaults to gpt-4.1 when env is unset", () => {
 		const original = process.env.COPILOT_MODEL;
-		delete process.env.COPILOT_MODEL;
+		process.env.COPILOT_MODEL = undefined;
 
 		const cfg = buildSessionConfig(makeInputs());
 		expect(cfg.model).toBe("gpt-4.1");
