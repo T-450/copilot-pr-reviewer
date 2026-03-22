@@ -4,6 +4,7 @@ import type { ReplyCandidateThread } from "./ado/client.ts";
 import { buildReplyRequest } from "./review.ts";
 
 export const REPLY_TIMEOUT = 120_000;
+export const MAX_REPLIES_PER_RUN = 25;
 
 export function extractAssistantText(response: unknown): string {
 	if (typeof response === "string") {
@@ -117,6 +118,7 @@ export async function runReplyLoop(options: {
 			>;
 		}
 	>;
+	const threadsToReply = actionableThreads.slice(0, MAX_REPLIES_PER_RUN);
 
 	if (actionableThreads.length === 0) {
 		return {
@@ -126,18 +128,34 @@ export async function runReplyLoop(options: {
 		};
 	}
 
+	if (actionableThreads.length > MAX_REPLIES_PER_RUN) {
+		options.warn?.(
+			`##vso[task.logissue type=warning]Reply loop limited this run to ${MAX_REPLIES_PER_RUN} threads out of ${actionableThreads.length} actionable follow-ups to avoid comment storms from stale thread scans`,
+		);
+	}
+
 	options.log?.(
-		`Replying to ${actionableThreads.length} follow-up thread${actionableThreads.length === 1 ? "" : "s"}...`,
+		`Replying to ${threadsToReply.length} follow-up thread${threadsToReply.length === 1 ? "" : "s"}...`,
 	);
 
 	const session = await options.createSession();
 	const fileExists =
 		options.fileExists ?? (async (path: string) => Bun.file(path).exists());
 	let repliesPosted = 0;
+	const attemptedReplyKeys = new Set<string>();
 
 	try {
-		for (const thread of actionableThreads) {
+		for (const thread of threadsToReply) {
 			try {
+				const replyKey = `${thread.id}:${thread.latestUserFollowUp.id}`;
+				if (attemptedReplyKeys.has(replyKey)) {
+					options.warn?.(
+						`##vso[task.logissue type=warning]Skipping duplicate reply attempt for thread ${thread.id} follow-up ${thread.latestUserFollowUp.id}`,
+					);
+					continue;
+				}
+				attemptedReplyKeys.add(replyKey);
+
 				const absolutePath = await resolveReplyAttachmentPath(
 					options.repoRoot,
 					thread.filePath,

@@ -76,6 +76,8 @@ type ReconcileResult = {
 const BOT_MARKER = "<!-- copilot-pr-reviewer-bot -->";
 const REPLY_MARKER = "<!-- copilot-pr-reviewer-reply -->";
 const FINGERPRINT_RE = /<!-- fingerprint:([^\s]+) -->/;
+const REPLY_METADATA_RE =
+	/<!--\s*(?:copilot-pr-reviewer-bot|copilot-pr-reviewer-reply|fingerprint:[^>]+|in-reply-to:\d+)\s*-->/g;
 
 const BINARY_EXTS = new Set([
 	".png",
@@ -391,7 +393,23 @@ function formatReplyBody(
 		readonly followUpCommentId?: number;
 	},
 ): string {
-	const lines = [replyText.trim(), "", REPLY_MARKER];
+	const sanitizedReplyText = replyText
+		.replace(REPLY_METADATA_RE, "")
+		.replace(/\n?---\n?/g, "\n")
+		.trim();
+
+	if (sanitizedReplyText === "") {
+		throw new Error("Reply body is empty after sanitization");
+	}
+
+	const lines = [
+		sanitizedReplyText,
+		"",
+		"---",
+		"<sub>Follow-up from Copilot PR Reviewer</sub>",
+		"",
+		REPLY_MARKER,
+	];
 
 	if (metadata.followUpCommentId !== undefined) {
 		lines.push(`<!-- in-reply-to:${metadata.followUpCommentId} -->`);

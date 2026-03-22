@@ -25,10 +25,12 @@ This phase turns the prototype into real pipeline behavior by wiring follow-up d
 
   Notes: added `runReplyLoop()` in `src/reply-loop.ts` and wired it into `src/index.ts` after create/resolve but before feedback collection; the live pass now refreshes bot-owned threads, filters to active threads with a new actionable human follow-up, reuses shared session wiring through `buildReplySessionConfig()`, and posts same-thread replies via the existing ADO helper surface without changing finding reconciliation.
 
-- [ ] Add reply body formatting and operational guardrails:
+- [x] Add reply body formatting and operational guardrails:
   - Format reply comments consistently with the repository's current thread voice and metadata style while distinguishing conversational replies from initial findings
   - Add minimal safeguards for empty replies, duplicate reply attempts during the same run, and comment storms caused by stale thread scans
   - Preserve graceful failure behavior so reply errors log warnings without blocking PR completion
+
+  Notes: updated `src/ado/client.ts` to sanitize reply text, add a reply-specific footer plus `in-reply-to` metadata, and reject bodies that collapse to metadata-only content; updated `src/reply-loop.ts` to dedupe same-run follow-up attempts and cap reply volume per run to avoid stale-scan storms while keeping warning-only failure behavior intact.
 
 - [ ] Write focused production integration tests for same-thread replies:
   - Add tests covering thread scan ordering, actionable follow-up detection, reply posting requests, duplicate-suppression logic, and orchestrator sequencing

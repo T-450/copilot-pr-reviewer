@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ReplyCandidateThread } from "../src/ado/client.ts";
 import {
 	extractAssistantText,
+	MAX_REPLIES_PER_RUN,
 	orderReplyCandidateThreads,
 	runReplyLoop,
 } from "../src/reply-loop.ts";
@@ -241,5 +242,81 @@ describe("runReplyLoop", () => {
 		expect(warnings[0]).toContain("thread 10");
 		expect(postedReplies).toEqual([11]);
 		expect(result.repliesPosted).toBe(1);
+	});
+
+	test("skips duplicate reply attempts for the same thread follow-up", async () => {
+		const warnings: string[] = [];
+		const postedReplies: number[] = [];
+
+		const result = await runReplyLoop({
+			repoRoot: "/repo",
+			listThreads: async () => [
+				makeThread({ id: 10, latestUserFollowUp: makeFollowUp({ id: 210 }) }),
+				makeThread({ id: 10, latestUserFollowUp: makeFollowUp({ id: 210 }) }),
+			],
+			createSession: async () => ({
+				sendAndWait: async () => "Deduped reply",
+				disconnect: async () => undefined,
+			}),
+			postReply: async (reply) => {
+				postedReplies.push(reply.threadId);
+			},
+			sleep: async () => undefined,
+			threadActionDelayMs: 0,
+			fileExists: async () => false,
+			warn: (message) => warnings.push(message),
+		});
+
+		expect(postedReplies).toEqual([10]);
+		expect(warnings[0]).toContain("Skipping duplicate reply attempt");
+		expect(result).toEqual({
+			scannedThreads: 2,
+			actionableThreads: 2,
+			repliesPosted: 1,
+		});
+	});
+
+	test("caps replies per run to avoid stale-scan storms", async () => {
+		const warnings: string[] = [];
+		const postedReplies: number[] = [];
+
+		const result = await runReplyLoop({
+			repoRoot: "/repo",
+			listThreads: async () =>
+				Array.from({ length: MAX_REPLIES_PER_RUN + 2 }, (_, index) =>
+					makeThread({
+						id: index + 1,
+						rootBotCommentId: index + 100,
+						latestUserFollowUp: makeFollowUp({
+							id: index + 200,
+							parentCommentId: index + 100,
+							publishedDate: `2026-03-22T12:${String(index).padStart(
+								2,
+								"0",
+							)}:00.000Z`,
+						}),
+					}),
+				),
+			createSession: async () => ({
+				sendAndWait: async () => "Storm-safe reply",
+				disconnect: async () => undefined,
+			}),
+			postReply: async (reply) => {
+				postedReplies.push(reply.threadId);
+			},
+			sleep: async () => undefined,
+			threadActionDelayMs: 0,
+			fileExists: async () => false,
+			warn: (message) => warnings.push(message),
+		});
+
+		expect(postedReplies).toHaveLength(MAX_REPLIES_PER_RUN);
+		expect(postedReplies.at(-1)).toBe(MAX_REPLIES_PER_RUN);
+		expect(warnings[0]).toContain("avoid comment storms");
+		expect(result).toEqual({
+			scannedThreads: MAX_REPLIES_PER_RUN + 2,
+			actionableThreads: MAX_REPLIES_PER_RUN + 2,
+			repliesPosted: MAX_REPLIES_PER_RUN,
+		});
 	});
 });

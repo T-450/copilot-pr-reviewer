@@ -1041,6 +1041,9 @@ describe("createThreadReply", () => {
 		expect(body.content).toContain(
 			"Thanks - the null branch still reaches readUserId().",
 		);
+		expect(body.content).toContain(
+			"<sub>Follow-up from Copilot PR Reviewer</sub>",
+		);
 		expect(body.content).toContain("<!-- copilot-pr-reviewer-reply -->");
 		expect(body.content).toContain("<!-- in-reply-to:30 -->");
 		expect(body.content).not.toContain("<!-- copilot-pr-reviewer-bot -->");
@@ -1059,6 +1062,41 @@ describe("createThreadReply", () => {
 			(fetchSpy.mock.calls[0][1] as RequestInit).body as string,
 		);
 		expect(body.content).not.toContain("<!-- in-reply-to:");
+	});
+
+	test("sanitizes duplicated reply metadata before posting", async () => {
+		fetchSpy.mockResolvedValue(jsonResponse({ id: 101 }));
+
+		await createThreadReply({
+			threadId: 9,
+			parentCommentId: 2,
+			replyText:
+				"Helpful follow-up.\n\n<!-- copilot-pr-reviewer-reply -->\n<!-- in-reply-to:12 -->\n---",
+			followUpCommentId: 12,
+		});
+
+		const body = JSON.parse(
+			(fetchSpy.mock.calls[0][1] as RequestInit).body as string,
+		);
+		expect(
+			body.content.match(/<!-- copilot-pr-reviewer-reply -->/g),
+		).toHaveLength(1);
+		expect(body.content.match(/<!-- in-reply-to:12 -->/g)).toHaveLength(1);
+		expect(body.content).not.toContain("\n---\n---\n");
+	});
+
+	test("rejects reply bodies that become empty after sanitization", async () => {
+		fetchSpy.mockResolvedValue(jsonResponse({ id: 102 }));
+
+		await expect(
+			createThreadReply({
+				threadId: 9,
+				parentCommentId: 2,
+				replyText: "<!-- copilot-pr-reviewer-reply -->",
+				followUpCommentId: 12,
+			}),
+		).rejects.toThrow("Reply body is empty after sanitization");
+		expect(fetchSpy).not.toHaveBeenCalled();
 	});
 });
 
