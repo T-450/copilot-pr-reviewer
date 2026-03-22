@@ -397,7 +397,7 @@ const toPost = newFindings
 )
 .map((finding) => ({
 finding,
-file: fileByPath.get(finding.filePath) as ChangedFile,
+file: fileByPath.get(finding.filePath)!,
 }));
 
 const toResolve = existingThreads

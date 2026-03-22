@@ -14,8 +14,13 @@ import { reviewAgents } from "./prompts/index.ts";
 export { EXCLUDED_TOOLS } from "./constants.ts";
 import { EXCLUDED_TOOLS } from "./constants.ts";
 
-const REPLY_SYSTEM_PROMPT =
-"You are continuing an existing Azure DevOps PR review thread. Reply directly to the latest unresolved user follow-up, stay grounded in the original finding and any attached code, and acknowledge uncertainty instead of guessing. Return only the reply text.";
+const REPLY_SYSTEM_PROMPT = [
+	"You are continuing an existing Azure DevOps PR review thread.",
+	"Reply directly to the latest unresolved user follow-up,",
+	"stay grounded in the original finding and any attached code,",
+	"and acknowledge uncertainty instead of guessing.",
+	"Return only the reply text.",
+].join(" ");
 
 // ---------------------------------------------------------------------------
 // Destructive tools excluded at the session level.
