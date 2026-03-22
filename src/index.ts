@@ -22,6 +22,7 @@ import { CHANGE_TYPE_LABELS, type Finding } from "./types.ts";
 import { buildReplySessionConfig, buildSessionConfig } from "./session.ts";
 import { createStreamingHandler } from "./streaming.ts";
 import { runReplyLoop } from "./reply-loop.ts";
+import { runPostReviewActions } from "./review-orchestrator.ts";
 
 const REVIEW_TIMEOUT = 120_000;
 const PLANNING_TIMEOUT = 30_000;
@@ -155,43 +156,44 @@ async function main(): Promise<void> {
 			threadsForReview: threadsToResolve,
 		} = reconcile(existingThreads, findingsToReconcile, filesToReview);
 
-		for (const createThreadTask of threadsToCreate) {
-			await createThread(createThreadTask.finding, createThreadTask.file, {
-				current: iterationDiff.currentIteration,
-				previous: iterationDiff.previousIteration,
-			});
-			await Bun.sleep(THREAD_ACTION_DELAY_MS);
-		}
-
-		for (const threadId of threadsToResolve) {
-			await resolveThread(threadId);
-			await Bun.sleep(THREAD_ACTION_DELAY_MS);
-		}
-
-		const replyResult = await runReplyLoop({
-			repoRoot,
-			listThreads: listReplyCandidateThreads,
-			createSession: () =>
-				client.createSession({
-					...buildReplySessionConfig({
-						repoId: process.env.ADO_REPO_ID ?? "",
-						prId: process.env.ADO_PR_ID ?? "",
-						iteration: iterationDiff.currentIteration,
-						pr,
-						config,
-						repoRoot,
-					}),
-					onEvent: createStreamingHandler(),
+		const { replyResult, feedback } = await runPostReviewActions({
+			threadsToCreate,
+			threadsToResolve,
+			existingThreads,
+			createThread,
+			resolveThread,
+			runReplyLoop: () =>
+				runReplyLoop({
+					repoRoot,
+					listThreads: listReplyCandidateThreads,
+					createSession: () =>
+						client.createSession({
+							...buildReplySessionConfig({
+								repoId: process.env.ADO_REPO_ID ?? "",
+								prId: process.env.ADO_PR_ID ?? "",
+								iteration: iterationDiff.currentIteration,
+								pr,
+								config,
+								repoRoot,
+							}),
+							onEvent: createStreamingHandler(),
+						}),
+					postReply: createThreadReply,
+					sleep: Bun.sleep,
+					threadActionDelayMs: THREAD_ACTION_DELAY_MS,
+					warn: console.warn,
+					log: console.log,
+					changeContextByFilePath,
 				}),
-			postReply: createThreadReply,
+			collectFeedback,
 			sleep: Bun.sleep,
 			threadActionDelayMs: THREAD_ACTION_DELAY_MS,
-			warn: console.warn,
-			log: console.log,
-			changeContextByFilePath,
+			iteration: {
+				current: iterationDiff.currentIteration,
+				previous: iterationDiff.previousIteration,
+			},
 		});
 
-		const feedback = await collectFeedback(existingThreads, false);
 		if (feedback.length > 0) {
 			console.log(`Collected ${feedback.length} feedback signals`);
 		}

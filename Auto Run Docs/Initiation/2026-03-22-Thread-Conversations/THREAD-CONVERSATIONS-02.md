@@ -32,10 +32,12 @@ This phase turns the prototype into real pipeline behavior by wiring follow-up d
 
   Notes: updated `src/ado/client.ts` to sanitize reply text, add a reply-specific footer plus `in-reply-to` metadata, and reject bodies that collapse to metadata-only content; updated `src/reply-loop.ts` to dedupe same-run follow-up attempts and cap reply volume per run to avoid stale-scan storms while keeping warning-only failure behavior intact.
 
-- [ ] Write focused production integration tests for same-thread replies:
+- [x] Write focused production integration tests for same-thread replies:
   - Add tests covering thread scan ordering, actionable follow-up detection, reply posting requests, duplicate-suppression logic, and orchestrator sequencing
   - Reuse current ADO client test factories and orchestration test patterns before adding new fixtures
   - Keep live-flow tests separate from validation runs and include at least one regression asserting that normal review comment creation still works when no follow-up replies exist
+
+  Notes: kept the existing `tests/ado-client.test.ts` and `tests/reply-loop.test.ts` coverage for thread scanning, actionable follow-up detection, reply POST payloads, and duplicate suppression, then added `tests/review-orchestrator.test.ts` plus the new `src/review-orchestrator.ts` helper to assert production sequencing (create -> resolve -> reply -> feedback) and a regression where normal review comments still post when the reply pass finds no actionable follow-ups; verified the new wiring with `npm exec tsc -- --noEmit` and `npm exec @biomejs/biome check ...` in this environment because the Bun binary is not installed here.
 
 - [ ] Run the production reply validation matrix and capture the result:
   - Run the relevant unit tests, orchestration tests, and typecheck; fix any regressions introduced by the live reply path
