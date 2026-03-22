@@ -11,7 +11,9 @@ import {
 	renderSystemPrompt,
 	renderFilePrompt,
 	renderPlanningPrompt,
+	renderReplyPrompt,
 } from "./prompts/index.ts";
+import type { ReplyCandidateThread, ThreadComment } from "./ado/client.ts";
 
 export const FindingArgsSchema = z.object({
 	filePath: z.string(),
@@ -92,6 +94,58 @@ export function buildPlanningPrompt(
 	return renderPlanningPrompt(pr, files);
 }
 
+type ReplyRequestOptions = {
+	readonly thread: ReplyCandidateThread;
+	readonly absolutePath?: string;
+	readonly changeContext?: string;
+};
+
+function sanitizeThreadCommentContent(content: string): string {
+	return content
+		.split("\n")
+		.filter(
+			(line) =>
+				line.trim() !== "<!-- copilot-pr-reviewer-bot -->" &&
+				!line.trim().startsWith("<!-- fingerprint:") &&
+				line.trim() !== "<sub>Was this helpful? React with 👍 or 👎</sub>",
+		)
+		.join("\n")
+		.replace(/\n?---\n?/g, "\n")
+		.trim();
+}
+
+function formatTranscriptComment(comment: ThreadComment): string {
+	const author = comment.author.displayName || (comment.isBot ? "Bot" : "User");
+	const timestamp = comment.publishedDate || "unknown-time";
+	const content =
+		sanitizeThreadCommentContent(comment.content) || "(empty comment)";
+	return `[${timestamp}] ${author}: ${content}`;
+}
+
+export function buildReplyPrompt(options: ReplyRequestOptions): string {
+	const rootComment =
+		options.thread.comments.find(
+			(comment) => comment.id === options.thread.rootBotCommentId,
+		) ?? options.thread.comments[0];
+	const findingSummary = rootComment
+		? sanitizeThreadCommentContent(rootComment.content)
+		: "Original finding summary unavailable.";
+	const latestUserPrompt = options.thread.latestUserFollowUp
+		? sanitizeThreadCommentContent(options.thread.latestUserFollowUp.content)
+		: "No actionable user follow-up was detected.";
+	const threadTranscript = options.thread.comments
+		.map(formatTranscriptComment)
+		.join("\n\n");
+
+	return renderReplyPrompt({
+		thread: options.thread,
+		findingSummary,
+		latestUserPrompt,
+		threadTranscript,
+		changeContext: options.changeContext,
+	});
+}
+
 /**
  * Build an attachment-first review request for a single file.
  *
@@ -112,5 +166,18 @@ export function buildFileReviewRequest(
 	return {
 		prompt: renderFilePrompt(filePath, changeType),
 		attachments: [{ type: "file", path: absolutePath }],
+	};
+}
+
+export function buildReplyRequest(
+	options: ReplyRequestOptions,
+): MessageOptions {
+	const attachments = options.absolutePath
+		? [{ type: "file" as const, path: options.absolutePath }]
+		: undefined;
+
+	return {
+		prompt: buildReplyPrompt(options),
+		attachments,
 	};
 }

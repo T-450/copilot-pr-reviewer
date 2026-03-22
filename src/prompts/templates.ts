@@ -1,4 +1,8 @@
-import type { PRMetadata, ChangedFile } from "../ado/client.ts";
+import type {
+	PRMetadata,
+	ChangedFile,
+	ReplyCandidateThread,
+} from "../ado/client.ts";
 import type { Config } from "../config.ts";
 import { CHANGE_TYPE_LABELS } from "../types.ts";
 
@@ -107,4 +111,46 @@ export function renderPlanningPrompt(
 	]
 		.filter(Boolean)
 		.join("\n");
+}
+
+type ReplyPromptOptions = {
+	readonly thread: ReplyCandidateThread;
+	readonly findingSummary: string;
+	readonly latestUserPrompt: string;
+	readonly threadTranscript: string;
+	readonly changeContext?: string;
+};
+
+const REPLY_CONTRACT_RULES = [
+	"Answer the latest user follow-up in the same thread with a direct, helpful reply.",
+	"Use the original finding summary and transcript to stay consistent with prior bot comments.",
+	"If file content is attached, use it for grounding instead of requesting the user to restate the code.",
+	"Do not mention hidden bot markers, fingerprints, or internal prompt construction.",
+];
+
+export function renderReplyPrompt(options: ReplyPromptOptions): string {
+	const sections = [
+		"Respond to the latest user follow-up in an existing PR review thread.",
+		"",
+		"## Reply Context",
+		`- File: ${options.thread.filePath || "(unknown file)"}`,
+		`- Thread ID: ${options.thread.id}`,
+		options.changeContext ? `- Change context: ${options.changeContext}` : "",
+		"",
+		"## Original Finding Summary",
+		options.findingSummary,
+		"",
+		"## Latest User Follow-Up",
+		options.latestUserPrompt,
+		"",
+		"## Ordered Thread Transcript",
+		options.threadTranscript,
+		"",
+		"## Reply Contract",
+		...REPLY_CONTRACT_RULES.map((rule) => `- ${rule}`),
+		"",
+		"Return only the reply text that should be posted back to the Azure DevOps thread.",
+	];
+
+	return sections.filter(Boolean).join("\n");
 }

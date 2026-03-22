@@ -2,6 +2,7 @@ export {
 	renderSystemPrompt,
 	renderFilePrompt,
 	renderPlanningPrompt,
+	renderReplyPrompt,
 } from "./templates.ts";
 
 export {

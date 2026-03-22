@@ -18,10 +18,12 @@ This phase adds a fully autonomous prototype for conversational PR threads by te
 
   Notes: extended `src/ado/client.ts` with normalized conversational thread types plus `listReplyCandidateThreads()`, kept `listBotThreads()` on the same fetch/auth path, and added targeted parsing coverage in `tests/ado-client.test.ts` for ordering, follow-up detection, and ignored comments. `npx tsc --noEmit` and `npx biome check src/ado/client.ts tests/ado-client.test.ts` passed; Bun test execution is still blocked in this environment because the `bun` binary is not installed.
 
-- [ ] Add a reply-mode prompt and request builder that preserves thread context:
+- [x] Add a reply-mode prompt and request builder that preserves thread context:
   - Reuse the current review prompt style and session configuration as the starting point for a follow-up assistant prompt
   - Build a focused prompt helper that includes the original finding summary, relevant file path/change context, and the ordered thread transcript needed to answer the user coherently
   - Keep the implementation attachment-first wherever file content is required, and avoid duplicating whole-file content into prompt text
+
+  Notes: added `renderReplyPrompt()` in `src/prompts/templates.ts` plus `buildReplyPrompt()`/`buildReplyRequest()` in `src/review.ts`, reusing the existing prompt-builder style while sanitizing the root finding summary and preserving the ordered thread transcript. Added focused coverage in `tests/review.test.ts` for reply prompt content, transcript ordering, and optional attachment-first request construction. `npx tsc --noEmit` and `npx biome check src/review.ts src/prompts/templates.ts src/prompts/index.ts tests/review.test.ts` passed; Bun test execution remains blocked in this environment because the `bun` binary is not installed.
 
 - [ ] Deliver a runnable prototype that replies inside a simulated or controlled thread flow without any user input:
   - Extend `src/prototype.ts` or add a closely related executable prototype path that seeds a sample finding thread, injects one or more user follow-up comments, runs the reply flow, and prints the generated same-thread response

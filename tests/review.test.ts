@@ -2,11 +2,17 @@ import { describe, expect, test } from "bun:test";
 import {
 	buildSystemPrompt,
 	buildFilePrompt,
+	buildReplyPrompt,
 	createEmitFindingTool,
 	buildPlanningPrompt,
 	buildFileReviewRequest,
+	buildReplyRequest,
 } from "../src/review.ts";
-import type { PRMetadata, ChangedFile } from "../src/ado/client.ts";
+import type {
+	PRMetadata,
+	ChangedFile,
+	ReplyCandidateThread,
+} from "../src/ado/client.ts";
 import type { Config } from "../src/config.ts";
 import type { Finding } from "../src/types.ts";
 
@@ -24,6 +30,103 @@ const samplePR: PRMetadata = {
 	title: "Fix null pointer in auth module",
 	description: "Addresses crash when user token expires mid-session",
 	workItemIds: [1234],
+};
+
+const sampleReplyThread: ReplyCandidateThread = {
+	id: 17,
+	filePath: "src/auth.ts",
+	fingerprint: "fp-123",
+	status: 1,
+	rootBotCommentId: 10,
+	botAuthorId: "bot-1",
+	latestBotReplyAt: "2026-03-22T12:03:00.000Z",
+	latestUserFollowUp: {
+		id: 30,
+		parentCommentId: 10,
+		content: "Can you explain why the null branch is still risky?",
+		publishedDate: "2026-03-22T12:04:00.000Z",
+		lastUpdatedDate: "2026-03-22T12:04:00.000Z",
+		isDeleted: false,
+		author: {
+			id: "user-1",
+			displayName: "Ada Reviewer",
+			uniqueName: "ada@example.com",
+			isContainer: false,
+		},
+		isBot: false,
+	},
+	comments: [
+		{
+			id: 10,
+			parentCommentId: 0,
+			content: [
+				"🟡 **WARNING** — Null branch can bypass the guard",
+				"",
+				"The fallback path can still dereference `session.user` after logout.",
+				"",
+				"---",
+				"<sub>Was this helpful? React with 👍 or 👎</sub>",
+				"",
+				"<!-- copilot-pr-reviewer-bot -->",
+				"<!-- fingerprint:fp-123 -->",
+			].join("\n"),
+			publishedDate: "2026-03-22T12:00:00.000Z",
+			lastUpdatedDate: "2026-03-22T12:00:00.000Z",
+			isDeleted: false,
+			author: {
+				id: "bot-1",
+				displayName: "Copilot Reviewer",
+				uniqueName: "bot@example.com",
+				isContainer: false,
+			},
+			isBot: true,
+		},
+		{
+			id: 20,
+			parentCommentId: 10,
+			content: "I was looking at the branch after logout.",
+			publishedDate: "2026-03-22T12:02:00.000Z",
+			lastUpdatedDate: "2026-03-22T12:02:00.000Z",
+			isDeleted: false,
+			author: {
+				id: "user-2",
+				displayName: "Lin Reviewer",
+				uniqueName: "lin@example.com",
+				isContainer: false,
+			},
+			isBot: false,
+		},
+		{
+			id: 25,
+			parentCommentId: 20,
+			content: "The risk is the stale fallback path, not the main login flow.",
+			publishedDate: "2026-03-22T12:03:00.000Z",
+			lastUpdatedDate: "2026-03-22T12:03:00.000Z",
+			isDeleted: false,
+			author: {
+				id: "bot-1",
+				displayName: "Copilot Reviewer",
+				uniqueName: "bot@example.com",
+				isContainer: false,
+			},
+			isBot: true,
+		},
+		{
+			id: 30,
+			parentCommentId: 10,
+			content: "Can you explain why the null branch is still risky?",
+			publishedDate: "2026-03-22T12:04:00.000Z",
+			lastUpdatedDate: "2026-03-22T12:04:00.000Z",
+			isDeleted: false,
+			author: {
+				id: "user-1",
+				displayName: "Ada Reviewer",
+				uniqueName: "ada@example.com",
+				isContainer: false,
+			},
+			isBot: false,
+		},
+	],
 };
 
 describe("buildSystemPrompt", () => {
@@ -286,5 +389,68 @@ describe("buildPlanningPrompt", () => {
 		const prompt = buildPlanningPrompt(samplePR, files);
 
 		expect(prompt).toContain("Fix null pointer");
+	});
+});
+
+describe("buildReplyPrompt", () => {
+	test("includes file path, change context, and latest follow-up", () => {
+		const prompt = buildReplyPrompt({
+			thread: sampleReplyThread,
+			changeContext: "edit in auth fallback handling",
+		});
+
+		expect(prompt).toContain("src/auth.ts");
+		expect(prompt).toContain("edit in auth fallback handling");
+		expect(prompt).toContain(
+			"Can you explain why the null branch is still risky?",
+		);
+	});
+
+	test("sanitizes root finding summary before embedding it", () => {
+		const prompt = buildReplyPrompt({ thread: sampleReplyThread });
+
+		expect(prompt).toContain("Null branch can bypass the guard");
+		expect(prompt).not.toContain("<!-- copilot-pr-reviewer-bot -->");
+		expect(prompt).not.toContain("<!-- fingerprint:fp-123 -->");
+	});
+
+	test("preserves ordered transcript entries with authors", () => {
+		const prompt = buildReplyPrompt({ thread: sampleReplyThread });
+
+		const rootIndex = prompt.indexOf("Copilot Reviewer: 🟡 **WARNING**");
+		const firstUserIndex = prompt.indexOf(
+			"Lin Reviewer: I was looking at the branch after logout.",
+		);
+		const lastUserIndex = prompt.indexOf(
+			"Ada Reviewer: Can you explain why the null branch is still risky?",
+		);
+
+		expect(rootIndex).toBeGreaterThan(-1);
+		expect(firstUserIndex).toBeGreaterThan(rootIndex);
+		expect(lastUserIndex).toBeGreaterThan(firstUserIndex);
+	});
+});
+
+describe("buildReplyRequest", () => {
+	test("returns prompt with file attachment when absolute path is provided", () => {
+		const request = buildReplyRequest({
+			thread: sampleReplyThread,
+			absolutePath: "/repo/src/auth.ts",
+			changeContext: "edit",
+		});
+
+		expect(request.prompt).toContain("Ordered Thread Transcript");
+		expect(request.attachments).toHaveLength(1);
+		const attachment = request.attachments?.[0];
+		if (attachment?.type === "file") {
+			expect(attachment.path).toBe("/repo/src/auth.ts");
+		}
+	});
+
+	test("omits attachments when no file path is needed", () => {
+		const request = buildReplyRequest({ thread: sampleReplyThread });
+
+		expect(request.attachments).toBeUndefined();
+		expect(request.prompt).toContain("Return only the reply text");
 	});
 });
