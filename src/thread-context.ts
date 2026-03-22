@@ -150,6 +150,33 @@ function isActionableUserComment(comment: ThreadComment): boolean {
 	return !comment.isDeleted && comment.body.trim() !== "" && !comment.isBot;
 }
 
+function findLatestActionableUserComment(
+	comments: readonly ThreadComment[],
+): ThreadComment | null {
+	return comments
+		.filter(isActionableUserComment)
+		.reduce<ThreadComment | null>((latest, comment) => {
+			if (latest === null) {
+				return comment;
+			}
+			return compareThreadComments(latest, comment) < 0 ? comment : latest;
+		}, null);
+}
+
+function resolveLatestUserFollowUp(
+	comments: readonly ThreadComment[],
+	answeredCommentIds: readonly number[],
+): ThreadComment | null {
+	const latestActionableUserComment = findLatestActionableUserComment(comments);
+	if (latestActionableUserComment === null) {
+		return null;
+	}
+
+	return answeredCommentIds.includes(latestActionableUserComment.id)
+		? null
+		: latestActionableUserComment;
+}
+
 export function buildReplyCandidateThread(
 	thread: RawAdoThread,
 ): ReplyCandidateThread | null {
@@ -206,24 +233,10 @@ export function buildReplyCandidateThread(
 				.filter((commentId): commentId is number => commentId !== null),
 		),
 	].sort((left, right) => left - right);
-	const answeredCommentIdSet = new Set(answeredCommentIds);
-	const latestResolvedAt =
-		latestBotCheckpoint?.publishedDate ?? latestBotReplyAt;
-
-	const latestUserFollowUp = comments
-		.filter(
-			(comment) =>
-				isActionableUserComment(comment) &&
-				!answeredCommentIdSet.has(comment.id) &&
-				parseTimestamp(comment.publishedDate) >
-					parseTimestamp(latestResolvedAt),
-		)
-		.reduce<ThreadComment | null>((latest, comment) => {
-			if (latest === null) {
-				return comment;
-			}
-			return compareThreadComments(latest, comment) < 0 ? comment : latest;
-		}, null);
+	const latestUserFollowUp = resolveLatestUserFollowUp(
+		comments,
+		answeredCommentIds,
+	);
 
 	return {
 		id: thread.id,

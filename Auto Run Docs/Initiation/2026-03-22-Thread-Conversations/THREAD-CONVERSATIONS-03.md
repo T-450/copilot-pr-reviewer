@@ -22,10 +22,11 @@ This phase strengthens the conversational feature so replies remain grounded acr
   - Keep prompt changes narrow and consistent with the current reviewer tone and severity-first style
   - Completed in `src/prompts/templates.ts` and `src/session.ts`; tightened the reply contract so answers lead with the newest unresolved question, stay anchored to the original finding, avoid unnecessary restatement, and explicitly acknowledge uncertainty when thread or file context is incomplete.
 
-- [ ] Add duplicate-response and stale-context protection:
+- [x] Add duplicate-response and stale-context protection:
   - Detect when the newest user comment has already been answered by the bot during an earlier run
   - Prevent replies that target outdated comments when a newer unresolved user follow-up exists in the same thread
   - Reuse thread metadata and comment ordering rather than inventing separate state files or external persistence for this phase unless clearly required by the decision note
+  - Completed in `src/thread-context.ts`; latest follow-up selection now targets only the newest actionable user comment, suppresses duplicate replies when that newest comment already has an `in-reply-to` checkpoint, and still recovers when an older comment was answered after a newer unresolved follow-up was posted.
 
 - [ ] Write focused quality and memory tests:
   - Add tests for multi-turn transcript normalization, latest-comment targeting, duplicate-answer suppression, and prompt/context rendering across at least three-turn conversations

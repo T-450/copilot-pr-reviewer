@@ -771,7 +771,7 @@ describe("listReplyCandidateThreads", () => {
 		expect(thread.latestUserFollowUp?.parentCommentId).toBe(10);
 	});
 
-	test("ignores deleted, empty, and stale user comments when finding follow-ups", async () => {
+	test("ignores deleted, empty, and already-answered user comments when finding follow-ups", async () => {
 		fetchSpy.mockResolvedValue(
 			jsonResponse({
 				value: [
@@ -792,7 +792,8 @@ describe("listReplyCandidateThreads", () => {
 							}),
 							makeAdoComment({
 								id: 3,
-								content: "Reply from bot",
+								content:
+									"Reply from bot\n\n<!-- copilot-pr-reviewer-reply -->\n<!-- in-reply-to:2 -->",
 								publishedDate: "2026-03-22T12:02:00.000Z",
 								author: { id: "bot-1", displayName: "Copilot Reviewer" },
 							}),
