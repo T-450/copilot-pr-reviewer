@@ -13,6 +13,7 @@ related:
   - "[[Copilot-SDK-0.1.32-Current-Surface]]"
   - "[[Copilot-SDK-DefineAgent-Verification]]"
   - "[[Phase-02-Prompt-Workflow-Validation-Report]]"
+  - "[[Copilot-SDK-Foundation-Implementation-Summary]]"
 ---
 
 # SDK 0.2.0 Upgrade Validation Report

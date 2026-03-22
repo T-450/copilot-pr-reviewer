@@ -22,10 +22,11 @@ This phase hardens the completed foundation work with full regression coverage, 
   - Fix regressions in small, isolated changes and rerun the affected commands until the foundation is stable
   - **Result:** Full verification matrix passes. Tests: 290 pass, 7 skip, 0 fail (638 assertions). Typecheck: clean. Biome: clean after fixing 34 lint issues across 9 files — `void` → `undefined` in hook union types, empty catch blocks, string concatenation → template literals, `noNonNullAssertion` suppressions, stale ESLint/biome-ignore comments, `delete` → `undefined` assignment. Production fix: replaced `!` with `as ChangedFile` in `src/ado/client.ts` reconcile (safe due to prior `.has()` filter). Prototype module graph loads cleanly (exits with expected token error). Main orchestrator (`src/index.ts`) exits 0 with graceful warning. Foundation is stable.
 
-- [ ] Produce release-oriented structured knowledge artifacts for the completed foundation:
+- [x] Produce release-oriented structured knowledge artifacts for the completed foundation:
   - Create a final validation report with YAML front matter summarizing the upgrade result, commands run, known limitations, and readiness for Phase 2
   - Create or update a concise implementation summary document with wiki-links to the research, decision records, and validation reports
   - Ensure the documents are organized so Maestro DocGraph or Obsidian can traverse the foundation migration history cleanly
+  - **Result:** Created two new documents: `docs/research/copilot-sdk/Phase-04-Foundation-Regression-Validation-Report.md` (final validation with all commands/results, test growth table Phase 01→04, 290-test coverage matrix, lint cleanup inventory, Phase 2 readiness assessment) and `docs/research/copilot-sdk/Copilot-SDK-Foundation-Implementation-Summary.md` (central hub linking all 9 research/decision/validation artifacts, phase timeline, architecture diagram, SDK API usage table). Added bidirectional wiki-links from 4 existing documents (Phase 01/02/03 validation reports, Upgrade Summary, Migration Decisions) back to the new summary for full DocGraph traversal. All documents use YAML front matter with typed `related` fields.
 
 - [ ] Sanity-check developer ergonomics before handing off to later phases:
   - Confirm the main execution path, environment expectations, and test entry points are discoverable from the repository

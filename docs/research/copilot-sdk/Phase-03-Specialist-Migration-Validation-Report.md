@@ -14,6 +14,8 @@ related:
   - "[[Copilot-SDK-0.2.0-Validation-Report]]"
   - "[[Copilot-SDK-0.2.0-Verified-Capabilities]]"
   - "[[Copilot-SDK-DefineAgent-Verification]]"
+  - "[[Phase-04-Foundation-Regression-Validation-Report]]"
+  - "[[Copilot-SDK-Foundation-Implementation-Summary]]"
 ---
 
 # Phase 03 Specialist Migration Validation Report
