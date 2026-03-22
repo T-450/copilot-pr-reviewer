@@ -11,10 +11,12 @@ This phase turns the prototype into real pipeline behavior by wiring follow-up d
 
   Notes: documented the Phase 02 execution order in `docs/architecture/Production-Reply-Loop-Orchestration-Order.md`, linked it from `docs/research/thread-conversations/Thread-Conversations-Hub.md`, and chose a reply pass that runs after reconcile + thread mutation but before final feedback/logging so live replies see the freshest active-thread state without changing finding semantics.
 
-- [ ] Add production-grade ADO helpers for posting bot replies into existing threads:
+- [x] Add production-grade ADO helpers for posting bot replies into existing threads:
   - Reuse the existing ADO auth, retry, and request-body style from `createThread` and `resolveThread`
   - Implement helpers for creating a reply comment on an existing thread, carrying forward bot markers or metadata needed for later detection without breaking current finding reconciliation
   - Keep the thread-update API surface narrow and testable so orchestration logic does not know Azure DevOps payload details
+
+  Notes: added `createThreadReply()` in `src/ado/client.ts` as the narrow POST helper for `/threads/{threadId}/comments`, reused the shared `adoFetch()` auth/retry path, and formatted reply bodies with a dedicated reply marker plus optional `in-reply-to` metadata so future follow-up detection can distinguish conversational bot replies without confusing root finding fingerprints.
 
 - [ ] Integrate follow-up reply handling into the main review pipeline:
   - Add a dedicated branch in `src/index.ts` that scans bot-owned active threads for actionable user follow-ups and runs a conversational reply pass before shutdown

@@ -15,6 +15,7 @@ import {
 	listBotThreads,
 	listReplyCandidateThreads,
 	createThread,
+	createThreadReply,
 	resolveThread,
 	type BotThread,
 	type ChangedFile,
@@ -1002,6 +1003,62 @@ describe("resolveThread", () => {
 
 		const body = JSON.parse(callInit.body as string);
 		expect(body.status).toBe(2);
+	});
+});
+
+describe("createThreadReply", () => {
+	let fetchSpy: ReturnType<typeof spyOn>;
+
+	beforeEach(() => {
+		setEnv();
+		fetchSpy = spyOn(globalThis, "fetch");
+	});
+
+	afterEach(() => {
+		mock.restore();
+		clearEnv();
+	});
+
+	test("posts a same-thread reply with reply metadata", async () => {
+		fetchSpy.mockResolvedValue(jsonResponse({ id: 99 }));
+
+		await createThreadReply({
+			threadId: 42,
+			parentCommentId: 10,
+			replyText: "Thanks - the null branch still reaches readUserId().",
+			followUpCommentId: 30,
+		});
+
+		const callUrl = fetchSpy.mock.calls[0][0] as string;
+		expect(callUrl).toContain("/threads/42/comments");
+
+		const callInit = fetchSpy.mock.calls[0][1] as RequestInit;
+		expect(callInit.method).toBe("POST");
+
+		const body = JSON.parse(callInit.body as string);
+		expect(body.parentCommentId).toBe(10);
+		expect(body.commentType).toBe(1);
+		expect(body.content).toContain(
+			"Thanks - the null branch still reaches readUserId().",
+		);
+		expect(body.content).toContain("<!-- copilot-pr-reviewer-reply -->");
+		expect(body.content).toContain("<!-- in-reply-to:30 -->");
+		expect(body.content).not.toContain("<!-- copilot-pr-reviewer-bot -->");
+	});
+
+	test("omits follow-up metadata when no triggering comment id is provided", async () => {
+		fetchSpy.mockResolvedValue(jsonResponse({ id: 100 }));
+
+		await createThreadReply({
+			threadId: 7,
+			parentCommentId: 1,
+			replyText: "Followed up in thread.",
+		});
+
+		const body = JSON.parse(
+			(fetchSpy.mock.calls[0][1] as RequestInit).body as string,
+		);
+		expect(body.content).not.toContain("<!-- in-reply-to:");
 	});
 });
 

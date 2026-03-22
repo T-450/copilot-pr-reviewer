@@ -74,6 +74,7 @@ type ReconcileResult = {
 };
 
 const BOT_MARKER = "<!-- copilot-pr-reviewer-bot -->";
+const REPLY_MARKER = "<!-- copilot-pr-reviewer-reply -->";
 const FINGERPRINT_RE = /<!-- fingerprint:([^\s]+) -->/;
 
 const BINARY_EXTS = new Set([
@@ -384,6 +385,21 @@ function formatThreadBody(finding: Finding): string {
 	return lines.join("\n");
 }
 
+function formatReplyBody(
+	replyText: string,
+	metadata: {
+		readonly followUpCommentId?: number;
+	},
+): string {
+	const lines = [replyText.trim(), "", REPLY_MARKER];
+
+	if (metadata.followUpCommentId !== undefined) {
+		lines.push(`<!-- in-reply-to:${metadata.followUpCommentId} -->`);
+	}
+
+	return lines.join("\n");
+}
+
 export async function createThread(
 	finding: Finding,
 	file: ChangedFile,
@@ -414,6 +430,27 @@ export async function createThread(
 	};
 
 	await adoFetch(`${base}/threads`, {
+		method: "POST",
+		body: JSON.stringify(body),
+	});
+}
+
+export async function createThreadReply(options: {
+	readonly threadId: number;
+	readonly parentCommentId: number;
+	readonly replyText: string;
+	readonly followUpCommentId?: number;
+}): Promise<void> {
+	const base = baseUrl();
+	const body = {
+		parentCommentId: options.parentCommentId,
+		content: formatReplyBody(options.replyText, {
+			followUpCommentId: options.followUpCommentId,
+		}),
+		commentType: 1,
+	};
+
+	await adoFetch(`${base}/threads/${options.threadId}/comments`, {
 		method: "POST",
 		body: JSON.stringify(body),
 	});
