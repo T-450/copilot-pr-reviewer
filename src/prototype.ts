@@ -41,8 +41,6 @@ const SEVERITY_ICON: Record<string, string> = {
 	nitpick: "[NITS]",
 };
 
-// ── Sample files for review ──────────────────────────────────────────────────
-
 const SAMPLE_FILES: Record<string, string> = {
 	"src/auth.ts": [
 		'import { createHash } from "crypto";',
@@ -84,8 +82,6 @@ const SAMPLE_FILES: Record<string, string> = {
 	].join("\n"),
 };
 
-// ── Streaming handler ────────────────────────────────────────────────────────
-
 function createStreamingHandler(): (event: SessionEvent) => void {
 	let dotCount = 0;
 	return (event) => {
@@ -106,8 +102,6 @@ function createStreamingHandler(): (event: SessionEvent) => void {
 		}
 	};
 }
-
-// ── Scaffold temp directory ──────────────────────────────────────────────────
 
 async function scaffoldTempDir(): Promise<string> {
 	const tmpDir = await mkdtemp(join(tmpdir(), "pr-reviewer-prototype-"));
@@ -138,8 +132,6 @@ async function scaffoldTempDir(): Promise<string> {
 
 	return tmpDir;
 }
-
-// ── Findings summary printer ─────────────────────────────────────────────────
 
 function printFindingsSummary(
 	findings: readonly Finding[],
@@ -190,8 +182,6 @@ function printFindingsSummary(
 	console.log("=".repeat(60));
 }
 
-// ── Main prototype flow ──────────────────────────────────────────────────────
-
 async function runPrototype(): Promise<void> {
 	const ghToken = process.env.COPILOT_GITHUB_TOKEN;
 	if (!ghToken) {
@@ -204,7 +194,6 @@ async function runPrototype(): Promise<void> {
 	console.log("PR Reviewer Prototype — SDK 0.2.0 Foundation");
 	console.log("=".repeat(60));
 
-	// 1. Scaffold temp directory with sample files
 	console.log("\n[1/6] Scaffolding sample project...");
 	const tmpDir = await scaffoldTempDir();
 	console.log(`  Created: ${tmpDir}`);
@@ -212,14 +201,12 @@ async function runPrototype(): Promise<void> {
 		console.log(`  + ${relPath}`);
 	}
 
-	// 2. Load config
 	console.log("\n[2/6] Loading config...");
 	const config = await loadConfig(join(tmpDir, ".prreviewer.yml"));
 	console.log(
 		`  severityThreshold=${config.severityThreshold}  reasoningEffort=${config.reasoningEffort}  planning=${config.planning}  clustering=${config.clustering}`,
 	);
 
-	// Simulated PR metadata and file list (reusing E2E pattern)
 	const pr: PRMetadata = {
 		title: "Add auth, API, and utility modules",
 		description:
@@ -233,7 +220,6 @@ async function runPrototype(): Promise<void> {
 		changeTrackingId: idx + 1,
 	}));
 
-	// 3. Create Copilot SDK session
 	console.log("\n[3/6] Creating Copilot SDK session...");
 	configureBundledInstructionDirs();
 
@@ -278,7 +264,6 @@ async function runPrototype(): Promise<void> {
 	);
 
 	try {
-		// 4. Planning phase (when enabled and >5 files, or always for prototype)
 		console.log("\n[4/6] Planning review strategy...");
 		const planStart = performance.now();
 		await session.sendAndWait(
@@ -288,7 +273,6 @@ async function runPrototype(): Promise<void> {
 		const planMs = Math.round(performance.now() - planStart);
 		console.log(`  Planning complete (${planMs}ms)`);
 
-		// 5. Review each file with attachment-first requests
 		console.log("\n[5/6] Reviewing files...");
 		const reviewStart = performance.now();
 		for (const file of files) {
@@ -311,7 +295,6 @@ async function runPrototype(): Promise<void> {
 		const reviewMs = Math.round(performance.now() - reviewStart);
 		console.log(`  All files reviewed (${reviewMs}ms total)`);
 
-		// 6. Cluster and summarize
 		console.log("\n[6/6] Clustering and summarizing...");
 		const reportable = findings.filter((f) =>
 			meetsThreshold(f.severity, config.severityThreshold),
@@ -336,8 +319,6 @@ async function runPrototype(): Promise<void> {
 		console.log(`Cleaned up: ${tmpDir}`);
 	}
 }
-
-// ── Entry point ──────────────────────────────────────────────────────────────
 
 runPrototype().catch((err) => {
 	console.error(

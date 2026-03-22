@@ -7,17 +7,12 @@ import type { CustomAgentConfig } from "@github/copilot-sdk";
 // emit_finding tool.  Destructive tools (edit_file, write_file, shell, etc.)
 // are excluded at the session level via `excludedTools` and are intentionally
 // absent here as well.
-// ---------------------------------------------------------------------------
 
 export const SPECIALIST_TOOLS: readonly string[] = [
 	"emit_finding",
 	"read_file",
 	"list_files",
 ];
-
-// ---------------------------------------------------------------------------
-// Security reviewer — OWASP-focused specialist sub-agent
-// ---------------------------------------------------------------------------
 
 const SECURITY_PROMPT = [
 	"You are a security specialist. Review code for:",
@@ -43,10 +38,6 @@ export const securityAgentConfig: CustomAgentConfig = {
 	infer: true,
 };
 
-// ---------------------------------------------------------------------------
-// Test reviewer — coverage and quality specialist sub-agent
-// ---------------------------------------------------------------------------
-
 const TEST_PROMPT = [
 	"You are a testing specialist. Review code for:",
 	"- Missing test coverage for new/changed code",
@@ -66,10 +57,6 @@ export const testAgentConfig: CustomAgentConfig = {
 	// See securityAgentConfig comment — same inference mechanism applies.
 	infer: true,
 };
-
-// ---------------------------------------------------------------------------
-// All review agents — convenience array for session setup
-// ---------------------------------------------------------------------------
 
 export const reviewAgents: readonly CustomAgentConfig[] = [
 	securityAgentConfig,
