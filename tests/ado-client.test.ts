@@ -821,6 +821,71 @@ describe("listReplyCandidateThreads", () => {
 		expect(thread.latestUserFollowUp).toBeNull();
 	});
 
+	test("preserves edited follow-up text and empty bot reply bodies for thread context", async () => {
+		fetchSpy.mockResolvedValue(
+			jsonResponse({
+				value: [
+					makeAdoThread({
+						id: 23,
+						threadContext: { filePath: "src/auth.ts" },
+						comments: [
+							makeAdoComment({
+								id: 1,
+								content: [
+									"Root finding summary",
+									"",
+									"<!-- copilot-pr-reviewer-bot -->",
+									"<!-- fingerprint:fp-context -->",
+								].join("\n"),
+								publishedDate: "2026-03-22T12:00:00.000Z",
+								author: { id: "bot-1", displayName: "Copilot Reviewer" },
+							}),
+							makeAdoComment({
+								id: 2,
+								parentCommentId: 1,
+								content: "Can you clarify the null path?",
+								publishedDate: "2026-03-22T12:01:00.000Z",
+								author: { id: "user-1", displayName: "Ada Reviewer" },
+							}),
+							makeAdoComment({
+								id: 3,
+								parentCommentId: 1,
+								content: [
+									"---",
+									"<sub>Follow-up from Copilot PR Reviewer</sub>",
+									"",
+									"<!-- copilot-pr-reviewer-reply -->",
+									"<!-- in-reply-to:2 -->",
+								].join("\n"),
+								publishedDate: "2026-03-22T12:02:00.000Z",
+								author: { id: "bot-1", displayName: "Copilot Reviewer" },
+							}),
+							makeAdoComment({
+								id: 4,
+								parentCommentId: 1,
+								content:
+									"I rechecked the logout flow. Is `session.user.id` still reachable?",
+								publishedDate: "2026-03-22T12:03:00.000Z",
+								lastUpdatedDate: "2026-03-22T12:04:00.000Z",
+								author: { id: "user-2", displayName: "Lin Reviewer" },
+							}),
+						],
+					}),
+				],
+			}),
+		);
+
+		const [thread] = await listReplyCandidateThreads();
+
+		expect(thread.comments.map((comment) => comment.id)).toEqual([1, 2, 3, 4]);
+		expect(thread.comments[2].body).toBe("");
+		expect(thread.latestUserFollowUp?.id).toBe(4);
+		expect(thread.latestUserFollowUp?.body).toContain("still reachable");
+		expect(thread.latestUserFollowUp?.lastUpdatedDate).toBe(
+			"2026-03-22T12:04:00.000Z",
+		);
+	});
+
 	test("ignores non-bot threads and keeps comment order stable on timestamp ties", async () => {
 		fetchSpy.mockResolvedValue(
 			jsonResponse({

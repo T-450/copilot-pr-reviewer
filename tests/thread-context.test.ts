@@ -248,6 +248,60 @@ describe("buildReplyCandidateThread", () => {
 		expect(thread?.answeredCommentIds).toEqual([30]);
 		expect(thread?.latestUserFollowUp).toBeNull();
 	});
+
+	test("keeps edited follow-up text and renders marker-only bot replies as empty transcript entries", () => {
+		const baseComments = makeRawThread().comments;
+		if (!baseComments) {
+			throw new Error("Expected sample comments");
+		}
+
+		const thread = buildReplyCandidateThread(
+			makeRawThread({
+				comments: [
+					{
+						...baseComments[3],
+						id: 31,
+						content:
+							"I re-ran the logout flow. Does `readUserId()` still dereference `session.user` after the fallback change?",
+						publishedDate: "2026-03-22T12:06:00.000Z",
+						lastUpdatedDate: "2026-03-22T12:07:00.000Z",
+					},
+					{
+						...baseComments[2],
+						content: [
+							"---",
+							"<sub>Follow-up from Copilot PR Reviewer</sub>",
+							"",
+							"<!-- copilot-pr-reviewer-reply -->",
+							"<!-- in-reply-to:20 -->",
+						].join("\n"),
+					},
+					baseComments[0],
+					baseComments[1],
+				],
+			}),
+		);
+
+		expect(thread?.comments.map((comment) => comment.id)).toEqual([
+			10, 20, 25, 31,
+		]);
+		expect(thread?.comments[2]?.body).toBe("");
+		expect(thread?.latestUserFollowUp?.id).toBe(31);
+		expect(thread?.latestUserFollowUp?.body).toContain("fallback change");
+		expect(thread?.latestUserFollowUp?.lastUpdatedDate).toBe(
+			"2026-03-22T12:07:00.000Z",
+		);
+
+		if (thread === null) {
+			throw new Error("Expected thread to normalize");
+		}
+
+		const transcript = buildThreadTranscript(thread.comments);
+		expect(transcript).toContain("Copilot Reviewer: (empty comment)");
+		expect(transcript).toContain(
+			"Lin Reviewer: I re-ran the logout flow. Does `readUserId()` still dereference `session.user` after the fallback change?",
+		);
+	});
 });
 
 describe("buildThreadTranscript", () => {

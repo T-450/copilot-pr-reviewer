@@ -28,10 +28,11 @@ This phase strengthens the conversational feature so replies remain grounded acr
   - Reuse thread metadata and comment ordering rather than inventing separate state files or external persistence for this phase unless clearly required by the decision note
   - Completed in `src/thread-context.ts`; latest follow-up selection now targets only the newest actionable user comment, suppresses duplicate replies when that newest comment already has an `in-reply-to` checkpoint, and still recovers when an older comment was answered after a newer unresolved follow-up was posted.
 
-- [ ] Write focused quality and memory tests:
+- [x] Write focused quality and memory tests:
   - Add tests for multi-turn transcript normalization, latest-comment targeting, duplicate-answer suppression, and prompt/context rendering across at least three-turn conversations
   - Reuse current prompt and ADO client test styles before creating new helpers
   - Keep these tests separate from validation runs and include edge cases such as missing bot marker content, edited comments, and mixed user/bot reply order
+  - Completed in `tests/thread-context.test.ts`, `tests/review.test.ts`, and `tests/ado-client.test.ts`; added coverage for edited follow-ups, marker-only bot replies, multi-turn prompt rendering, and ADO thread normalization while keeping validation/reporting for the next task.
 
 - [ ] Validate multi-turn context retention and record the outcome:
   - Run the relevant test suites and typecheck; fix issues in small, isolated changes before closing the phase

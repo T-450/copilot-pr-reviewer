@@ -463,6 +463,89 @@ describe("buildReplyPrompt", () => {
 		);
 		expect(prompt).toContain("instead of guessing or bluffing");
 	});
+
+	test("renders multi-turn context with the newest edited follow-up and empty bot replies", () => {
+		const thread: ReplyCandidateThread = {
+			...sampleReplyThread,
+			latestUserFollowUp: {
+				id: 40,
+				parentCommentId: 10,
+				content:
+					"I rechecked the patch. Is the dereference still reachable after logout?",
+				body: "I rechecked the patch. Is the dereference still reachable after logout?",
+				publishedDate: "2026-03-22T12:05:00.000Z",
+				lastUpdatedDate: "2026-03-22T12:06:00.000Z",
+				isDeleted: false,
+				author: {
+					id: "user-2",
+					displayName: "Lin Reviewer",
+					uniqueName: "lin@example.com",
+					isContainer: false,
+				},
+				isBot: false,
+				role: "user",
+				replyToCommentId: null,
+			},
+			comments: [
+				...sampleReplyThread.comments,
+				{
+					id: 35,
+					parentCommentId: 10,
+					content: [
+						"---",
+						"<sub>Follow-up from Copilot PR Reviewer</sub>",
+						"",
+						"<!-- copilot-pr-reviewer-reply -->",
+						"<!-- in-reply-to:30 -->",
+					].join("\n"),
+					body: "",
+					publishedDate: "2026-03-22T12:04:30.000Z",
+					lastUpdatedDate: "2026-03-22T12:04:30.000Z",
+					isDeleted: false,
+					author: {
+						id: "bot-1",
+						displayName: "Copilot Reviewer",
+						uniqueName: "bot@example.com",
+						isContainer: false,
+					},
+					isBot: true,
+					role: "bot",
+					replyToCommentId: 30,
+				},
+				{
+					id: 40,
+					parentCommentId: 10,
+					content:
+						"I rechecked the patch. Is the dereference still reachable after logout?",
+					body: "I rechecked the patch. Is the dereference still reachable after logout?",
+					publishedDate: "2026-03-22T12:05:00.000Z",
+					lastUpdatedDate: "2026-03-22T12:06:00.000Z",
+					isDeleted: false,
+					author: {
+						id: "user-2",
+						displayName: "Lin Reviewer",
+						uniqueName: "lin@example.com",
+						isContainer: false,
+					},
+					isBot: false,
+					role: "user",
+					replyToCommentId: null,
+				},
+			],
+		};
+
+		const prompt = buildReplyPrompt({ thread });
+
+		expect(prompt).toContain(
+			"I rechecked the patch. Is the dereference still reachable after logout?",
+		);
+		expect(prompt).toContain("Copilot Reviewer: (empty comment)");
+		expect(prompt).toContain(
+			"Lin Reviewer: I was looking at the branch after logout.",
+		);
+		expect(prompt).not.toContain("<!-- copilot-pr-reviewer-reply -->");
+		expect(prompt).not.toContain("<!-- in-reply-to:30 -->");
+	});
 });
 
 describe("buildReplyRequest", () => {
