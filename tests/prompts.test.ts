@@ -3,6 +3,7 @@ import {
 	renderSystemPrompt,
 	renderFilePrompt,
 	renderPlanningPrompt,
+	renderReplyPrompt,
 	SPECIALIST_TOOLS,
 	reviewAgents,
 	securityAgentConfig,
@@ -10,6 +11,7 @@ import {
 } from "../src/prompts/index.ts";
 import type { PRMetadata, ChangedFile } from "../src/ado/client.ts";
 import type { Config } from "../src/config.ts";
+import type { ReplyCandidateThread } from "../src/thread-context.ts";
 import { CHANGE_TYPE_LABELS } from "../src/types.ts";
 
 // ── Shared fixtures ─────────────────────────────────────────────────────────
@@ -28,6 +30,39 @@ const samplePR: PRMetadata = {
 	title: "Fix null pointer in auth module",
 	description: "Addresses crash when user token expires mid-session",
 	workItemIds: [1234],
+};
+
+const sampleReplyThread: ReplyCandidateThread = {
+	id: 17,
+	filePath: "src/auth.ts",
+	fingerprint: "fp-123",
+	status: 1,
+	rootBotCommentId: 10,
+	botAuthorId: "bot-1",
+	findingSummary:
+		"🟡 **WARNING** — Null branch can bypass the guard\n\nThe fallback path can still dereference `session.user` after logout.",
+	latestBotReplyAt: "2026-03-22T12:03:00.000Z",
+	latestBotCheckpoint: null,
+	answeredCommentIds: [],
+	latestUserFollowUp: {
+		id: 30,
+		parentCommentId: 10,
+		content: "Can you explain why the null branch is still risky?",
+		body: "Can you explain why the null branch is still risky?",
+		publishedDate: "2026-03-22T12:04:00.000Z",
+		lastUpdatedDate: "2026-03-22T12:04:00.000Z",
+		isDeleted: false,
+		author: {
+			id: "user-1",
+			displayName: "Ada Reviewer",
+			uniqueName: "ada@example.com",
+			isContainer: false,
+		},
+		isBot: false,
+		role: "user",
+		replyToCommentId: null,
+	},
+	comments: [],
 };
 
 // ── renderSystemPrompt ──────────────────────────────────────────────────────
@@ -241,6 +276,43 @@ describe("renderPlanningPrompt", () => {
 		expect(prompt).not.toContain("```");
 		expect(prompt).not.toContain("import ");
 		expect(prompt).not.toContain("function ");
+	});
+});
+
+describe("renderReplyPrompt", () => {
+	test("includes direct-answer, grounding, and uncertainty guidance", () => {
+		const prompt = renderReplyPrompt({
+			thread: sampleReplyThread,
+			findingSummary: sampleReplyThread.findingSummary,
+			latestUserPrompt:
+				sampleReplyThread.latestUserFollowUp?.body ?? "missing follow-up",
+			threadTranscript:
+				"[2026-03-22T12:00:00.000Z] Copilot Reviewer: Root finding",
+		});
+
+		expect(prompt).toContain(
+			"Start by answering the latest unresolved question",
+		);
+		expect(prompt).toContain(
+			"Reference the original issue or affected code path",
+		);
+		expect(prompt).toContain("acknowledge the uncertainty");
+		expect(prompt).toContain("instead of guessing or bluffing");
+	});
+
+	test("tells the model not to restate the full finding unless it helps", () => {
+		const prompt = renderReplyPrompt({
+			thread: sampleReplyThread,
+			findingSummary: sampleReplyThread.findingSummary,
+			latestUserPrompt:
+				sampleReplyThread.latestUserFollowUp?.body ?? "missing follow-up",
+			threadTranscript:
+				"[2026-03-22T12:00:00.000Z] Copilot Reviewer: Root finding",
+		});
+
+		expect(prompt).toContain(
+			"do not restate the full finding unless it helps clarify the answer",
+		);
 	});
 });
 

@@ -16,10 +16,11 @@ This phase strengthens the conversational feature so replies remain grounded acr
   - Reuse existing domain types and avoid embedding Azure DevOps response shapes deep inside prompt logic
   - Completed in `src/thread-context.ts`, with `src/ado/client.ts` reusing the new normalization layer and focused coverage added in `tests/thread-context.test.ts`.
 
-- [ ] Improve reply generation quality with explicit conversational constraints:
+- [x] Improve reply generation quality with explicit conversational constraints:
   - Update prompt templates or helper renderers so follow-up replies reference the original issue, answer the latest question directly, and avoid restating the full finding unless it helps clarify the answer
   - Add clear rules for uncertainty, missing code context, and when the bot should acknowledge limits instead of bluffing
   - Keep prompt changes narrow and consistent with the current reviewer tone and severity-first style
+  - Completed in `src/prompts/templates.ts` and `src/session.ts`; tightened the reply contract so answers lead with the newest unresolved question, stay anchored to the original finding, avoid unnecessary restatement, and explicitly acknowledge uncertainty when thread or file context is incomplete.
 
 - [ ] Add duplicate-response and stale-context protection:
   - Detect when the newest user comment has already been answered by the bot during an earlier run

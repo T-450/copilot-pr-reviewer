@@ -448,6 +448,21 @@ describe("buildReplyPrompt", () => {
 		expect(firstUserIndex).toBeGreaterThan(rootIndex);
 		expect(lastUserIndex).toBeGreaterThan(firstUserIndex);
 	});
+
+	test("adds conversational quality guardrails for uncertainty and concise grounding", () => {
+		const prompt = buildReplyPrompt({ thread: sampleReplyThread });
+
+		expect(prompt).toContain(
+			"Start by answering the latest unresolved question",
+		);
+		expect(prompt).toContain(
+			"do not restate the full finding unless it helps clarify the answer",
+		);
+		expect(prompt).toContain(
+			"acknowledge the uncertainty and say what cannot be confirmed",
+		);
+		expect(prompt).toContain("instead of guessing or bluffing");
+	});
 });
 
 describe("buildReplyRequest", () => {

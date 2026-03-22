@@ -12,7 +12,7 @@ import { buildSessionInstructionConfig } from "./instructions.ts";
 import { reviewAgents } from "./prompts/index.ts";
 
 const REPLY_SYSTEM_PROMPT =
-	"You are continuing an existing Azure DevOps PR review thread. Reply directly to the latest user follow-up and return only the reply text.";
+	"You are continuing an existing Azure DevOps PR review thread. Reply directly to the latest unresolved user follow-up, stay grounded in the original finding and any attached code, and acknowledge uncertainty instead of guessing. Return only the reply text.";
 
 // ---------------------------------------------------------------------------
 // Destructive tools excluded at the session level.
