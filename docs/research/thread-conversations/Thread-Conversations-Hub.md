@@ -13,6 +13,7 @@ related:
   - "[[Same-Thread-Reply-Prototype-Plan]]"
   - "[[Phase-01-Same-Thread-Reply-Prototype-Validation-Report]]"
   - "[[Production-Reply-Loop-Orchestration-Order]]"
+  - "[[Phase-02-Production-Reply-Loop-Validation-Report]]"
   - "[[Copilot-SDK-Foundation-Implementation-Summary]]"
 ---
 
@@ -27,6 +28,7 @@ This hub links the Phase 01 research needed to add same-thread conversational re
 - [[Same-Thread-Reply-Prototype-Plan]] - smallest runnable prototype that proves reply generation works without changing the production pipeline.
 - [[Phase-01-Same-Thread-Reply-Prototype-Validation-Report]] - validation status, commands run, working prototype evidence, and the final Phase 01 closure result.
 - [[Production-Reply-Loop-Orchestration-Order]] - Phase 02 execution order for placing live reply handling alongside planning, reconcile, thread mutation, and feedback collection.
+- [[Phase-02-Production-Reply-Loop-Validation-Report]] - production reply-loop readiness, full test evidence, prototype revalidation, and current known limits.
 
 ## Phase 01 Scope
 

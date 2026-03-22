@@ -39,7 +39,9 @@ This phase turns the prototype into real pipeline behavior by wiring follow-up d
 
   Notes: kept the existing `tests/ado-client.test.ts` and `tests/reply-loop.test.ts` coverage for thread scanning, actionable follow-up detection, reply POST payloads, and duplicate suppression, then added `tests/review-orchestrator.test.ts` plus the new `src/review-orchestrator.ts` helper to assert production sequencing (create -> resolve -> reply -> feedback) and a regression where normal review comments still post when the reply pass finds no actionable follow-ups; verified the new wiring with `npm exec tsc -- --noEmit` and `npm exec @biomejs/biome check ...` in this environment because the Bun binary is not installed here.
 
-- [ ] Run the production reply validation matrix and capture the result:
+- [x] Run the production reply validation matrix and capture the result:
   - Run the relevant unit tests, orchestration tests, and typecheck; fix any regressions introduced by the live reply path
   - Execute the prototype or an equivalent non-live harness after the production integration changes to confirm prototype behavior still holds
   - Write a structured validation report with YAML front matter summarizing reply-loop readiness, known limits, and links to the architecture note and Phase 01 prototype artifacts
+
+  Notes: ran `npm exec --yes bun -- test` (317 pass, 7 skip, 0 fail across 324 tests), `npm exec --yes bun -- run typecheck`, and `npm exec --yes bun -- run prototype:reply`; captured the Phase 02 readiness result in `docs/research/thread-conversations/Phase-02-Production-Reply-Loop-Validation-Report.md` and linked it from `docs/research/thread-conversations/Thread-Conversations-Hub.md`, with the known limit that live SDK reply generation still requires `COPILOT_GITHUB_TOKEN`.
