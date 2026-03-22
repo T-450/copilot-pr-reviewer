@@ -11,6 +11,8 @@ const SEVERITY_ORDER: Record<Severity, number> = {
 	nitpick: 3,
 };
 
+const ReasoningEffort = z.enum(["low", "medium", "high", "xhigh"]);
+
 const ConfigSchema = z
 	.object({
 		ignore: z.array(z.string()).default([]),
@@ -19,6 +21,7 @@ const ConfigSchema = z
 		planning: z.boolean().default(true),
 		clustering: z.boolean().default(true),
 		clusterThreshold: z.number().int().min(2).default(3),
+		reasoningEffort: ReasoningEffort.default("low"),
 	})
 	.passthrough();
 

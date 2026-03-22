@@ -48,7 +48,9 @@ describe.skipIf(!HAS_TOKEN)("SDK integration", () => {
 
 	afterAll(async () => {
 		if (client) {
-			await client.stop().catch(() => {});
+			await client.stop().catch(() => {
+				/* cleanup */
+			});
 		}
 		if (tmpDir) {
 			await rm(tmpDir, { recursive: true, force: true });
