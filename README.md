@@ -21,6 +21,8 @@ cp .env.example .env
 | Command | Description |
 |---------|-------------|
 | `bun run start` | Run the reviewer (requires env vars) |
+| `bun run prototype` | Run the end-to-end review prototype |
+| `bun run prototype:reply` | Run the same-thread reply prototype |
 | `bun test` | Run all tests |
 | `bun test --watch` | Watch mode |
 | `bun test --coverage` | Coverage report |

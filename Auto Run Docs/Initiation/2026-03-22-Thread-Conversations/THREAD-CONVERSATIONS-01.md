@@ -25,10 +25,12 @@ This phase adds a fully autonomous prototype for conversational PR threads by te
 
   Notes: added `renderReplyPrompt()` in `src/prompts/templates.ts` plus `buildReplyPrompt()`/`buildReplyRequest()` in `src/review.ts`, reusing the existing prompt-builder style while sanitizing the root finding summary and preserving the ordered thread transcript. Added focused coverage in `tests/review.test.ts` for reply prompt content, transcript ordering, and optional attachment-first request construction. `npx tsc --noEmit` and `npx biome check src/review.ts src/prompts/templates.ts src/prompts/index.ts tests/review.test.ts` passed; Bun test execution remains blocked in this environment because the `bun` binary is not installed.
 
-- [ ] Deliver a runnable prototype that replies inside a simulated or controlled thread flow without any user input:
+- [x] Deliver a runnable prototype that replies inside a simulated or controlled thread flow without any user input:
   - Extend `src/prototype.ts` or add a closely related executable prototype path that seeds a sample finding thread, injects one or more user follow-up comments, runs the reply flow, and prints the generated same-thread response
   - Make the output visibly useful by showing the detected trigger comment, the conversation context used, and the final reply text
   - Keep the prototype runnable through a Bun command so Phase 01 ends with a tangible working artifact
+
+  Notes: added `src/reply-prototype.ts` plus the `bun run prototype:reply` entry in `package.json`, using the existing reply-request builder to seed a realistic bot thread, show the trigger comment + transcript context, and print the generated same-thread reply. The command runs non-interactively in either `copilot-sdk` mode (when `COPILOT_GITHUB_TOKEN` is set) or a controlled offline mode for local/demo runs. Added `tests/reply-prototype.test.ts` to cover the attachment-first request, nested response text extraction, and a non-interactive prototype flow. Validation is still deferred in this environment because `bun`, `tsc`, and `biome` are not installed here.
 
 - [ ] Write focused tests for conversational thread parsing and reply request construction:
   - Add tests for identifying reply candidates, preserving thread order, excluding non-actionable comments, and building the reply prompt/request payload
