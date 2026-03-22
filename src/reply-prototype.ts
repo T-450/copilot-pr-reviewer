@@ -9,7 +9,10 @@ import { join } from "node:path";
 import type { ReplyCandidateThread } from "./ado/client.ts";
 import { createHooks } from "./hooks.ts";
 import { configureBundledInstructionDirs } from "./instructions.ts";
+import { extractAssistantText } from "./reply-loop.ts";
 import { buildReplyRequest } from "./review.ts";
+
+export { extractAssistantText } from "./reply-loop.ts";
 
 const REPLY_TIMEOUT = 60_000;
 const SAMPLE_FILE_PATH = "src/auth.ts";
@@ -196,43 +199,6 @@ function extractPromptSection(prompt: string, heading: string): string {
 	return (
 		nextHeadingIndex === -1 ? remaining : remaining.slice(0, nextHeadingIndex)
 	).trim();
-}
-
-export function extractAssistantText(response: unknown): string {
-	if (typeof response === "string") {
-		return response.trim();
-	}
-
-	if (Array.isArray(response)) {
-		const text = response
-			.map((entry) => extractAssistantText(entry))
-			.filter((entry) => entry !== "")
-			.join("\n\n")
-			.trim();
-		return text;
-	}
-
-	if (response && typeof response === "object") {
-		const record = response as Record<string, unknown>;
-		for (const key of [
-			"content",
-			"text",
-			"message",
-			"response",
-			"messages",
-			"output",
-			"data",
-		]) {
-			if (key in record) {
-				const text = extractAssistantText(record[key]);
-				if (text !== "") {
-					return text;
-				}
-			}
-		}
-	}
-
-	return response == null ? "" : String(response).trim();
 }
 
 function buildControlledReply(thread: ReplyCandidateThread): string {

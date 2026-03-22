@@ -18,7 +18,9 @@ import {
 } from "../src/hooks.ts";
 import { loadConfig } from "../src/config.ts";
 import {
+	buildReplySessionConfig,
 	buildSessionConfig,
+	getReplySystemPrompt,
 	type SessionConfigInputs,
 } from "../src/session.ts";
 import type { PRMetadata } from "../src/ado/client.ts";
@@ -826,6 +828,26 @@ describe("session config — systemMessage", () => {
 		expect(msg.content).toContain("My Custom PR");
 		expect(msg.content).toContain("Custom desc");
 		expect(msg.content).toContain("999");
+	});
+
+	test("reply session config swaps in the reply-only system prompt", () => {
+		const cfg = buildReplySessionConfig({
+			repoId: "repo-1",
+			prId: "42",
+			iteration: 1,
+			pr: samplePR,
+			config: defaultConfig,
+			repoRoot: "/tmp/test-repo",
+		});
+		const msg = cfg.systemMessage as { content: string; mode: string };
+
+		expect(cfg.sessionId).toBe("reply-repo-1-42-1");
+		expect(msg.mode).toBe("append");
+		expect(msg.content).toBe(getReplySystemPrompt());
+		expect(msg.content).not.toContain("emit_finding");
+		// biome-ignore lint/suspicious/noExplicitAny: accessing SDK config property
+		expect((cfg as any).customAgents).toEqual([]);
+		expect(cfg.tools).toEqual([]);
 	});
 });
 

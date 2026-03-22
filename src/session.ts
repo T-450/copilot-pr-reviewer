@@ -11,6 +11,9 @@ import { createHooks } from "./hooks.ts";
 import { buildSessionInstructionConfig } from "./instructions.ts";
 import { reviewAgents } from "./prompts/index.ts";
 
+const REPLY_SYSTEM_PROMPT =
+	"You are continuing an existing Azure DevOps PR review thread. Reply directly to the latest user follow-up and return only the reply text.";
+
 // ---------------------------------------------------------------------------
 // Destructive tools excluded at the session level.
 //
@@ -98,6 +101,25 @@ export function buildSessionConfig(inputs: SessionConfigInputs): SessionConfig {
 	};
 }
 
+export function buildReplySessionConfig(
+	inputs: Omit<SessionConfigInputs, "tools" | "agents">,
+): SessionConfig {
+	const baseConfig = buildSessionConfig({
+		...inputs,
+		tools: [],
+		agents: [],
+	});
+
+	return {
+		...baseConfig,
+		sessionId: `reply-${inputs.repoId}-${inputs.prId}-${inputs.iteration}`,
+		systemMessage: {
+			content: REPLY_SYSTEM_PROMPT,
+			mode: "append",
+		},
+	};
+}
+
 /**
  * Return the session-level excluded tools list.
  * Exposed for test assertions — the canonical deny-list lives here,
@@ -105,4 +127,8 @@ export function buildSessionConfig(inputs: SessionConfigInputs): SessionConfig {
  */
 export function getExcludedTools(): readonly string[] {
 	return EXCLUDED_TOOLS;
+}
+
+export function getReplySystemPrompt(): string {
+	return REPLY_SYSTEM_PROMPT;
 }

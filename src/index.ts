@@ -4,7 +4,9 @@ import {
 	fetchPRMetadata,
 	fetchIterationDiff,
 	listBotThreads,
+	listReplyCandidateThreads,
 	createThread,
+	createThreadReply,
 	resolveThread,
 	reconcile,
 	collectFeedback,
@@ -17,8 +19,9 @@ import {
 import { configureBundledInstructionDirs } from "./instructions.ts";
 import { clusterFindings } from "./cluster.ts";
 import { CHANGE_TYPE_LABELS, type Finding } from "./types.ts";
-import { buildSessionConfig } from "./session.ts";
+import { buildReplySessionConfig, buildSessionConfig } from "./session.ts";
 import { createStreamingHandler } from "./streaming.ts";
+import { runReplyLoop } from "./reply-loop.ts";
 
 const REVIEW_TIMEOUT = 120_000;
 const PLANNING_TIMEOUT = 30_000;
@@ -74,6 +77,12 @@ async function main(): Promise<void> {
 	configureBundledInstructionDirs();
 
 	const repoRoot = process.env.REPO_ROOT ?? process.cwd();
+	const changeContextByFilePath = new Map(
+		filesToReview.map((file) => [
+			file.path,
+			CHANGE_TYPE_LABELS[file.changeType] ?? "unknown",
+		]),
+	);
 
 	const client = new CopilotClient({ cwd: repoRoot });
 
@@ -159,13 +168,36 @@ async function main(): Promise<void> {
 			await Bun.sleep(THREAD_ACTION_DELAY_MS);
 		}
 
+		const replyResult = await runReplyLoop({
+			repoRoot,
+			listThreads: listReplyCandidateThreads,
+			createSession: () =>
+				client.createSession({
+					...buildReplySessionConfig({
+						repoId: process.env.ADO_REPO_ID ?? "",
+						prId: process.env.ADO_PR_ID ?? "",
+						iteration: iterationDiff.currentIteration,
+						pr,
+						config,
+						repoRoot,
+					}),
+					onEvent: createStreamingHandler(),
+				}),
+			postReply: createThreadReply,
+			sleep: Bun.sleep,
+			threadActionDelayMs: THREAD_ACTION_DELAY_MS,
+			warn: console.warn,
+			log: console.log,
+			changeContextByFilePath,
+		});
+
 		const feedback = await collectFeedback(existingThreads, false);
 		if (feedback.length > 0) {
 			console.log(`Collected ${feedback.length} feedback signals`);
 		}
 
 		console.log(
-			`Review complete: ${threadsToCreate.length} new comments, ${threadsToResolve.length} resolved`,
+			`Review complete: ${threadsToCreate.length} new comments, ${threadsToResolve.length} resolved, ${replyResult.repliesPosted} follow-up replies`,
 		);
 	} finally {
 		await session.disconnect();

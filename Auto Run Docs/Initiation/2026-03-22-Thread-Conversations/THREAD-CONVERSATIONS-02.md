@@ -18,10 +18,12 @@ This phase turns the prototype into real pipeline behavior by wiring follow-up d
 
   Notes: added `createThreadReply()` in `src/ado/client.ts` as the narrow POST helper for `/threads/{threadId}/comments`, reused the shared `adoFetch()` auth/retry path, and formatted reply bodies with a dedicated reply marker plus optional `in-reply-to` metadata so future follow-up detection can distinguish conversational bot replies without confusing root finding fingerprints.
 
-- [ ] Integrate follow-up reply handling into the main review pipeline:
+- [x] Integrate follow-up reply handling into the main review pipeline:
   - Add a dedicated branch in `src/index.ts` that scans bot-owned active threads for actionable user follow-ups and runs a conversational reply pass before shutdown
   - Reuse `buildSessionConfig()` and existing session lifecycle patterns wherever possible instead of creating a second session architecture unless a narrow helper is clearly cleaner
   - Ensure the live flow skips non-bot threads, already-answered comments, and threads that do not contain a qualifying user follow-up
+
+  Notes: added `runReplyLoop()` in `src/reply-loop.ts` and wired it into `src/index.ts` after create/resolve but before feedback collection; the live pass now refreshes bot-owned threads, filters to active threads with a new actionable human follow-up, reuses shared session wiring through `buildReplySessionConfig()`, and posts same-thread replies via the existing ADO helper surface without changing finding reconciliation.
 
 - [ ] Add reply body formatting and operational guardrails:
   - Format reply comments consistently with the repository's current thread voice and metadata style while distinguishing conversational replies from initial findings
