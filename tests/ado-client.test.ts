@@ -932,6 +932,64 @@ describe("listReplyCandidateThreads", () => {
 		]);
 		expect(result[0].latestUserFollowUp?.id).toBe(11);
 	});
+
+	test("keeps the newest unresolved follow-up when an older question was answered later", async () => {
+		fetchSpy.mockResolvedValue(
+			jsonResponse({
+				value: [
+					makeAdoThread({
+						id: 24,
+						threadContext: { filePath: "src/auth.ts" },
+						comments: [
+							makeAdoComment({
+								id: 1,
+								content: [
+									"Root finding summary",
+									"",
+									"<!-- copilot-pr-reviewer-bot -->",
+									"<!-- fingerprint:fp-multiturn -->",
+								].join("\n"),
+								publishedDate: "2026-03-22T12:00:00.000Z",
+								author: { id: "bot-1", displayName: "Copilot Reviewer" },
+							}),
+							makeAdoComment({
+								id: 2,
+								parentCommentId: 1,
+								content: "First question",
+								publishedDate: "2026-03-22T12:01:00.000Z",
+								author: { id: "user-1", displayName: "Lin Reviewer" },
+							}),
+							makeAdoComment({
+								id: 3,
+								parentCommentId: 1,
+								content: "Newest unresolved question",
+								publishedDate: "2026-03-22T12:03:00.000Z",
+								author: { id: "user-2", displayName: "Ada Reviewer" },
+							}),
+							makeAdoComment({
+								id: 4,
+								parentCommentId: 1,
+								content: [
+									"Answering only the earlier question.",
+									"",
+									"<!-- copilot-pr-reviewer-reply -->",
+									"<!-- in-reply-to:2 -->",
+								].join("\n"),
+								publishedDate: "2026-03-22T12:04:00.000Z",
+								author: { id: "bot-1", displayName: "Copilot Reviewer" },
+							}),
+						],
+					}),
+				],
+			}),
+		);
+
+		const [thread] = await listReplyCandidateThreads();
+
+		expect(thread.answeredCommentIds).toEqual([2]);
+		expect(thread.latestUserFollowUp?.id).toBe(3);
+		expect(thread.latestUserFollowUp?.body).toBe("Newest unresolved question");
+	});
 });
 
 describe("createThread", () => {
@@ -1147,6 +1205,33 @@ describe("createThreadReply", () => {
 		).toHaveLength(1);
 		expect(body.content.match(/<!-- in-reply-to:12 -->/g)).toHaveLength(1);
 		expect(body.content).not.toContain("\n---\n---\n");
+	});
+
+	test("strips stale bot metadata and fingerprints from reply bodies before posting", async () => {
+		fetchSpy.mockResolvedValue(jsonResponse({ id: 103 }));
+
+		await createThreadReply({
+			threadId: 10,
+			parentCommentId: 3,
+			replyText: [
+				"Clarified reply body.",
+				"",
+				"<!-- copilot-pr-reviewer-bot -->",
+				"<!-- fingerprint:fp-stale -->",
+				"<!-- copilot-pr-reviewer-reply -->",
+			].join("\n"),
+			followUpCommentId: 18,
+		});
+
+		const body = JSON.parse(
+			(fetchSpy.mock.calls[0][1] as RequestInit).body as string,
+		);
+		expect(body.content).toContain("Clarified reply body.");
+		expect(body.content).not.toContain("fp-stale");
+		expect(
+			body.content.match(/<!-- copilot-pr-reviewer-reply -->/g),
+		).toHaveLength(1);
+		expect(body.content).not.toContain("<!-- copilot-pr-reviewer-bot -->");
 	});
 
 	test("rejects reply bodies that become empty after sanitization", async () => {

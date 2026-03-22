@@ -581,4 +581,17 @@ describe("buildReplyRequest", () => {
 		expect(request.attachments).toBeUndefined();
 		expect(request.prompt).toContain("Return only the reply text");
 	});
+
+	test("falls back to a no-actionable-follow-up message when the thread has no latest user comment", () => {
+		const request = buildReplyRequest({
+			thread: {
+				...sampleReplyThread,
+				latestUserFollowUp: null,
+			},
+		});
+
+		expect(request.prompt).toContain(
+			"No actionable user follow-up was detected.",
+		);
+	});
 });

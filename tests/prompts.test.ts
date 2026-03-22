@@ -311,6 +311,27 @@ describe("renderReplyPrompt", () => {
 			"do not restate the full finding unless it helps clarify the answer",
 		);
 	});
+
+	test("includes change context and transcript sections for multi-turn replies", () => {
+		const prompt = renderReplyPrompt({
+			thread: sampleReplyThread,
+			findingSummary: sampleReplyThread.findingSummary,
+			latestUserPrompt:
+				sampleReplyThread.latestUserFollowUp?.body ?? "missing follow-up",
+			threadTranscript: [
+				"[2026-03-22T12:00:00.000Z] Copilot Reviewer: Root finding",
+				"[2026-03-22T12:02:00.000Z] Ada Reviewer: Earlier clarification",
+				"[2026-03-22T12:04:00.000Z] Ada Reviewer: Latest unresolved question",
+			].join("\n\n"),
+			changeContext: "edit",
+		});
+
+		expect(prompt).toContain("## Reply Context");
+		expect(prompt).toContain("- Change context: edit");
+		expect(prompt).toContain("## Ordered Thread Transcript");
+		expect(prompt).toContain("Latest unresolved question");
+		expect(prompt).toContain("Do not mention hidden bot markers");
+	});
 });
 
 // ── CHANGE_TYPE_LABELS ──────────────────────────────────────────────────────

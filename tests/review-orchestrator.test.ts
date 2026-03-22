@@ -141,4 +141,96 @@ describe("runPostReviewActions", () => {
 		expect(result.replyResult.repliesPosted).toBe(0);
 		expect(result.feedback).toEqual([]);
 	});
+
+	test("surfaces reply loop error without blocking feedback", async () => {
+		const steps: string[] = [];
+
+		const result = await runPostReviewActions({
+			threadsToCreate: [],
+			threadsToResolve: [],
+			existingThreads: [makeThread()],
+			createThread: async () => undefined,
+			resolveThread: async () => undefined,
+			runReplyLoop: async () => {
+				steps.push("reply-loop-threw");
+				throw new Error("reply session failed");
+			},
+			collectFeedback: async () => {
+				steps.push("feedback-after-error");
+				return [];
+			},
+			sleep: async () => undefined,
+			threadActionDelayMs: 0,
+			iteration: { current: 3, previous: 2 },
+		}).catch((error) => {
+			steps.push(`caught:${(error as Error).message}`);
+			return null;
+		});
+
+		expect(steps).toContain("reply-loop-threw");
+		expect(result).toBeNull();
+	});
+
+	test("handles empty thread lists without errors", async () => {
+		const result = await runPostReviewActions({
+			threadsToCreate: [],
+			threadsToResolve: [],
+			existingThreads: [],
+			createThread: async () => undefined,
+			resolveThread: async () => undefined,
+			runReplyLoop: async () => ({
+				scannedThreads: 0,
+				actionableThreads: 0,
+				repliesPosted: 0,
+			}),
+			collectFeedback: async () => [],
+			sleep: async () => undefined,
+			threadActionDelayMs: 0,
+			iteration: { current: 1, previous: 0 },
+		});
+
+		expect(result.replyResult.repliesPosted).toBe(0);
+		expect(result.feedback).toEqual([]);
+	});
+
+	test("still collects feedback after the reply loop reports a graceful no-op", async () => {
+		const steps: string[] = [];
+
+		const result = await runPostReviewActions({
+			threadsToCreate: [],
+			threadsToResolve: [],
+			existingThreads: [makeThread({ id: 900, fingerprint: "fp-feedback" })],
+			createThread: async () => {
+				steps.push("create");
+			},
+			resolveThread: async () => {
+				steps.push("resolve");
+			},
+			runReplyLoop: async () => {
+				steps.push("reply-loop");
+				return {
+					scannedThreads: 4,
+					actionableThreads: 2,
+					repliesPosted: 0,
+				};
+			},
+			collectFeedback: async (threads, prMerged) => {
+				steps.push(`feedback:${threads[0]?.id}:${prMerged}`);
+				return [
+					{ fingerprint: "fp-feedback", signal: "addressed", threadId: 900 },
+				];
+			},
+			sleep: async () => {
+				steps.push("sleep");
+			},
+			threadActionDelayMs: 25,
+			iteration: { current: 8, previous: 7 },
+			prMerged: true,
+		});
+
+		expect(steps).toEqual(["reply-loop", "feedback:900:true"]);
+		expect(result.feedback).toEqual([
+			{ fingerprint: "fp-feedback", signal: "addressed", threadId: 900 },
+		]);
+	});
 });

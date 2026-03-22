@@ -147,6 +147,7 @@ describe("runReplyLoop", () => {
 
 	test("posts same-thread replies for active follow-ups in stable order", async () => {
 		const sendCalls: string[] = [];
+		const attachmentPaths: string[] = [];
 		const postedReplies: Array<{
 			threadId: number;
 			parentCommentId: number;
@@ -181,6 +182,10 @@ describe("runReplyLoop", () => {
 			createSession: async () => ({
 				sendAndWait: async (request) => {
 					sendCalls.push(request.prompt);
+					const attachment = request.attachments?.[0];
+					if (attachment?.type === "file") {
+						attachmentPaths.push(attachment.path);
+					}
 					return { message: { content: `Reply ${sendCalls.length}` } };
 				},
 				disconnect: async () => undefined,
@@ -190,10 +195,17 @@ describe("runReplyLoop", () => {
 			},
 			sleep: async () => undefined,
 			threadActionDelayMs: 0,
-			fileExists: async () => false,
+			fileExists: async (path) => path === "/repo/src/older.ts",
+			changeContextByFilePath: new Map([
+				["src/older.ts", "edit"],
+				["src/newer.ts", "rename"],
+			]),
 		});
 
 		expect(sendCalls).toHaveLength(2);
+		expect(sendCalls[0]).toContain("- Change context: edit");
+		expect(sendCalls[1]).toContain("- Change context: rename");
+		expect(attachmentPaths).toEqual(["/repo/src/older.ts"]);
 		expect(postedReplies).toEqual([
 			{
 				threadId: 20,
@@ -209,6 +221,39 @@ describe("runReplyLoop", () => {
 			},
 		]);
 		expect(result.repliesPosted).toBe(2);
+	});
+
+	test("warns on empty reply content and still disconnects the session", async () => {
+		const warnings: string[] = [];
+		const postedReplies: number[] = [];
+		let disconnected = false;
+
+		const result = await runReplyLoop({
+			repoRoot: "/repo",
+			listThreads: async () => [makeThread({ id: 70 })],
+			createSession: async () => ({
+				sendAndWait: async () => ({ message: { content: "   " } }),
+				disconnect: async () => {
+					disconnected = true;
+				},
+			}),
+			postReply: async (reply) => {
+				postedReplies.push(reply.threadId);
+			},
+			sleep: async () => undefined,
+			threadActionDelayMs: 0,
+			fileExists: async () => false,
+			warn: (message) => warnings.push(message),
+		});
+
+		expect(postedReplies).toEqual([]);
+		expect(warnings[0]).toContain("Reply generation returned empty content");
+		expect(disconnected).toBe(true);
+		expect(result).toEqual({
+			scannedThreads: 1,
+			actionableThreads: 1,
+			repliesPosted: 0,
+		});
 	});
 
 	test("warns and continues when one reply generation fails", async () => {

@@ -37,6 +37,12 @@ export function extractAssistantText(response: unknown): string {
 				}
 			}
 		}
+
+		return Object.values(record)
+			.map((value) => extractAssistantText(value))
+			.filter((value) => value !== "")
+			.join("\n\n")
+			.trim();
 	}
 
 	return response == null ? "" : String(response).trim();
