@@ -18,10 +18,11 @@ This phase upgrades the project to `@github/copilot-sdk` `0.2.0`, verifies the r
     - `docs/research/copilot-sdk/Copilot-SDK-DefineAgent-Verification.md`
     - `docs/research/copilot-sdk/Copilot-SDK-Upgrade-Summary.md`
 
-- [ ] Upgrade the SDK baseline while preserving current behavior:
+- [x] Upgrade the SDK baseline while preserving current behavior:
   - Update `@github/copilot-sdk` to `0.2.0` and refresh the lockfile using the project’s existing package workflow
   - Review any TypeScript surface changes in the installed package before editing application code
   - Record migration constraints, non-goals, and compatibility decisions in a structured markdown decision note with YAML front matter and wiki-links to the research docs
+  - Completed: SDK upgraded to 0.2.0, typecheck and all 83 tests pass with zero code changes, decision note at `docs/research/copilot-sdk/Copilot-SDK-0.2.0-Migration-Decisions.md`
 
 - [ ] Refactor the review session foundation to verified `0.2.0` APIs and keep the current review flow intact:
   - Replace the manual `emit_finding` tool definition with `defineTool()` and the existing Zod schema from `src/review.ts`
