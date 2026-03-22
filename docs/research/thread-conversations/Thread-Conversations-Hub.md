@@ -16,14 +16,14 @@ related:
   - "[[Production-Reply-Loop-Orchestration-Order]]"
   - "[[Phase-02-Production-Reply-Loop-Validation-Report]]"
   - "[[Phase-03-Context-Memory-Validation-Report]]"
-  - "[[Phase-04-Release-Readiness-Validation-Report]]"
+  - "[[Phase-04-Hardening-Validation-Report]]"
   - "[[Thread-Conversations-Implementation-Summary]]"
   - "[[Copilot-SDK-Foundation-Implementation-Summary]]"
 ---
 
 # Thread Conversations Research Hub
 
-This hub links the Phase 01 research needed to add same-thread conversational replies to Azure DevOps PR review comments.
+This hub links all research, architecture, decisions, and validation evidence for the same-thread conversational reply feature added to the Azure DevOps PR reviewer. Start at [[Thread-Conversations-Implementation-Summary]] for the concise feature overview.
 
 ## Documents
 
@@ -35,19 +35,19 @@ This hub links the Phase 01 research needed to add same-thread conversational re
 - [[Production-Reply-Loop-Orchestration-Order]] - Phase 02 execution order for placing live reply handling alongside planning, reconcile, thread mutation, and feedback collection.
 - [[Phase-02-Production-Reply-Loop-Validation-Report]] - production reply-loop readiness, full test evidence, prototype revalidation, and current known limits.
 - [[Phase-03-Context-Memory-Validation-Report]] - Phase 03 validation evidence for transcript rehydration, reply checkpoints, latest-follow-up targeting, and current thread-memory limits.
-- [[Phase-04-Release-Readiness-Validation-Report]] - final hardening validation for regressions, operational logging, prototype re-checks, and rollout readiness.
+- [[Phase-04-Hardening-Validation-Report]] - final hardening validation for regressions, operational logging, prototype re-checks, and rollout readiness.
 - [[Thread-Conversations-Implementation-Summary]] - concise feature history linking architecture, memory decisions, all validation reports, and follow-on extension hooks.
 
-## Phase 01 Scope
+## Feature Path (Phases 01–04)
 
-The prototype only needs to prove this path:
+1. **Phase 01 — Prototype:** Proved follow-up detection, context assembly, and reply generation in a controlled harness.
+2. **Phase 02 — Production orchestration:** Integrated the reply pass into the live pipeline after reconcile/create/resolve, before feedback.
+3. **Phase 03 — Context memory:** Added deterministic transcript rehydration and reply checkpoints per [[Thread-Conversation-Memory-Model]].
+4. **Phase 04 — Hardening:** Cleanup audit, 17 new regression tests (346 pass), CI-safe runtime logging, and rollout validation.
 
-1. Detect a qualifying user follow-up inside a bot-owned review thread.
-2. Build a context-aware reply request from the existing finding plus ordered thread history.
-3. Generate a same-thread reply in a controlled prototype flow.
+## Current Non-Goals
 
-## Non-Goals For This Phase
-
-- Changing the production PR review pipeline by default.
-- Auto-posting replies back to live Azure DevOps threads.
+- Cross-run persistence beyond in-thread bot metadata.
+- Human-in-the-loop approval gates for replies.
+- Multi-bot thread support.
 - Reworking finding fingerprints or reconciliation semantics.
