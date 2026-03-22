@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ReplyCandidateThread } from "../src/thread-context.ts";
 import {
+	buildReplyLoopSummary,
 	extractAssistantText,
 	MAX_REPLIES_PER_RUN,
 	orderReplyCandidateThreads,
@@ -397,5 +398,100 @@ describe("runReplyLoop", () => {
 			actionableThreads: MAX_REPLIES_PER_RUN + 2,
 			repliesPosted: MAX_REPLIES_PER_RUN,
 		});
+	});
+
+	test("includes failed reply count in summary log", async () => {
+		const logs: string[] = [];
+		let callCount = 0;
+
+		await runReplyLoop({
+			repoRoot: "/repo",
+			listThreads: async () => [
+				makeThread({ id: 40 }),
+				makeThread({
+					id: 41,
+					latestUserFollowUp: makeFollowUp({
+						id: 241,
+						publishedDate: "2026-03-22T12:06:00.000Z",
+					}),
+				}),
+			],
+			createSession: async () => ({
+				sendAndWait: async () => {
+					callCount += 1;
+					if (callCount === 1) {
+						throw new Error("network error");
+					}
+					return "OK reply";
+				},
+				disconnect: async () => undefined,
+			}),
+			postReply: async () => undefined,
+			sleep: async () => undefined,
+			threadActionDelayMs: 0,
+			fileExists: async () => false,
+			log: (message) => logs.push(message),
+			warn: () => undefined,
+		});
+
+		expect(logs.at(-1)).toBe(
+			"Reply loop scanned 2 threads; 2 actionable follow-up candidates; 1 reply posted; skipped: 1 reply failed during handling",
+		);
+	});
+});
+
+describe("buildReplyLoopSummary", () => {
+	test("combines multiple skip reasons into one summary line", () => {
+		const summary = buildReplyLoopSummary({
+			scannedThreads: 15,
+			actionableThreads: 8,
+			repliesPosted: 4,
+			skipped: {
+				deferredByRunCap: 0,
+				duplicateFollowUps: 1,
+				emptyReplies: 2,
+				failedReplies: 1,
+			},
+		});
+
+		expect(summary).toBe(
+			"Reply loop scanned 15 threads; 8 actionable follow-up candidates; 4 replies posted; skipped: 1 duplicate follow-up already attempted, 2 replies returned empty content, 1 reply failed during handling",
+		);
+	});
+
+	test("omits skipped section when all counts are zero", () => {
+		const summary = buildReplyLoopSummary({
+			scannedThreads: 3,
+			actionableThreads: 2,
+			repliesPosted: 2,
+			skipped: {
+				deferredByRunCap: 0,
+				duplicateFollowUps: 0,
+				emptyReplies: 0,
+				failedReplies: 0,
+			},
+		});
+
+		expect(summary).toBe(
+			"Reply loop scanned 3 threads; 2 actionable follow-up candidates; 2 replies posted",
+		);
+	});
+
+	test("uses singular nouns for single counts", () => {
+		const summary = buildReplyLoopSummary({
+			scannedThreads: 1,
+			actionableThreads: 1,
+			repliesPosted: 0,
+			skipped: {
+				deferredByRunCap: 0,
+				duplicateFollowUps: 0,
+				emptyReplies: 1,
+				failedReplies: 0,
+			},
+		});
+
+		expect(summary).toBe(
+			"Reply loop scanned 1 thread; 1 actionable follow-up candidate; 0 replies posted; skipped: 1 reply returned empty content",
+		);
 	});
 });

@@ -21,7 +21,7 @@ function pluralize(
 	return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function buildReplyLoopSummary(options: {
+export function buildReplyLoopSummary(options: {
 	readonly scannedThreads: number;
 	readonly actionableThreads: number;
 	readonly repliesPosted: number;
@@ -43,13 +43,13 @@ function buildReplyLoopSummary(options: {
 
 	if (options.skipped.emptyReplies > 0) {
 		skippedReasons.push(
-			`${pluralize(options.skipped.emptyReplies, "reply")} returned empty content`,
+			`${pluralize(options.skipped.emptyReplies, "reply", "replies")} returned empty content`,
 		);
 	}
 
 	if (options.skipped.failedReplies > 0) {
 		skippedReasons.push(
-			`${pluralize(options.skipped.failedReplies, "reply")} failed during handling`,
+			`${pluralize(options.skipped.failedReplies, "reply", "replies")} failed during handling`,
 		);
 	}
 

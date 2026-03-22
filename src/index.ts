@@ -198,8 +198,12 @@ async function main(): Promise<void> {
 			console.log(`Collected ${feedback.length} feedback signals`);
 		}
 
+		const replyStats =
+			replyResult.scannedThreads > 0
+				? `${replyResult.repliesPosted}/${replyResult.actionableThreads} follow-up replies (${replyResult.scannedThreads} scanned)`
+				: `${replyResult.repliesPosted} follow-up replies`;
 		console.log(
-			`Review complete: ${threadsToCreate.length} new comments, ${threadsToResolve.length} resolved, ${replyResult.repliesPosted} follow-up replies`,
+			`Review complete: ${threadsToCreate.length} new comments, ${threadsToResolve.length} resolved, ${replyStats}`,
 		);
 	} finally {
 		await session.disconnect();
