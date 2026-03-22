@@ -118,6 +118,7 @@ describe("orderReplyCandidateThreads", () => {
 describe("runReplyLoop", () => {
 	test("skips session creation when there are no actionable follow-ups", async () => {
 		let createdSession = false;
+		const logs: string[] = [];
 
 		const result = await runReplyLoop({
 			repoRoot: "/repo",
@@ -135,9 +136,13 @@ describe("runReplyLoop", () => {
 			postReply: async () => undefined,
 			sleep: async () => undefined,
 			threadActionDelayMs: 0,
+			log: (message) => logs.push(message),
 		});
 
 		expect(createdSession).toBe(false);
+		expect(logs).toEqual([
+			"Reply loop scanned 2 threads; 0 actionable follow-up candidates; 0 replies posted",
+		]);
 		expect(result).toEqual({
 			scannedThreads: 2,
 			actionableThreads: 0,
@@ -148,6 +153,7 @@ describe("runReplyLoop", () => {
 	test("posts same-thread replies for active follow-ups in stable order", async () => {
 		const sendCalls: string[] = [];
 		const attachmentPaths: string[] = [];
+		const logs: string[] = [];
 		const postedReplies: Array<{
 			threadId: number;
 			parentCommentId: number;
@@ -196,6 +202,7 @@ describe("runReplyLoop", () => {
 			sleep: async () => undefined,
 			threadActionDelayMs: 0,
 			fileExists: async (path) => path === "/repo/src/older.ts",
+			log: (message) => logs.push(message),
 			changeContextByFilePath: new Map([
 				["src/older.ts", "edit"],
 				["src/newer.ts", "rename"],
@@ -203,6 +210,10 @@ describe("runReplyLoop", () => {
 		});
 
 		expect(sendCalls).toHaveLength(2);
+		expect(logs).toEqual([
+			"Reply loop found 2 actionable follow-up candidates; replying to 2 threads...",
+			"Reply loop scanned 2 threads; 2 actionable follow-up candidates; 2 replies posted",
+		]);
 		expect(sendCalls[0]).toContain("- Change context: edit");
 		expect(sendCalls[1]).toContain("- Change context: rename");
 		expect(attachmentPaths).toEqual(["/repo/src/older.ts"]);
@@ -225,6 +236,7 @@ describe("runReplyLoop", () => {
 
 	test("warns on empty reply content and still disconnects the session", async () => {
 		const warnings: string[] = [];
+		const logs: string[] = [];
 		const postedReplies: number[] = [];
 		let disconnected = false;
 
@@ -243,10 +255,14 @@ describe("runReplyLoop", () => {
 			sleep: async () => undefined,
 			threadActionDelayMs: 0,
 			fileExists: async () => false,
+			log: (message) => logs.push(message),
 			warn: (message) => warnings.push(message),
 		});
 
 		expect(postedReplies).toEqual([]);
+		expect(logs.at(-1)).toBe(
+			"Reply loop scanned 1 thread; 1 actionable follow-up candidate; 0 replies posted; skipped: 1 reply returned empty content",
+		);
 		expect(warnings[0]).toContain("Reply generation returned empty content");
 		expect(disconnected).toBe(true);
 		expect(result).toEqual({
@@ -299,6 +315,7 @@ describe("runReplyLoop", () => {
 
 	test("skips duplicate reply attempts for the same thread follow-up", async () => {
 		const warnings: string[] = [];
+		const logs: string[] = [];
 		const postedReplies: number[] = [];
 
 		const result = await runReplyLoop({
@@ -317,10 +334,14 @@ describe("runReplyLoop", () => {
 			sleep: async () => undefined,
 			threadActionDelayMs: 0,
 			fileExists: async () => false,
+			log: (message) => logs.push(message),
 			warn: (message) => warnings.push(message),
 		});
 
 		expect(postedReplies).toEqual([10]);
+		expect(logs.at(-1)).toBe(
+			"Reply loop scanned 2 threads; 2 actionable follow-up candidates; 1 reply posted; skipped: 1 duplicate follow-up already attempted",
+		);
 		expect(warnings[0]).toContain("Skipping duplicate reply attempt");
 		expect(result).toEqual({
 			scannedThreads: 2,
@@ -331,6 +352,7 @@ describe("runReplyLoop", () => {
 
 	test("caps replies per run to avoid stale-scan storms", async () => {
 		const warnings: string[] = [];
+		const logs: string[] = [];
 		const postedReplies: number[] = [];
 
 		const result = await runReplyLoop({
@@ -360,11 +382,15 @@ describe("runReplyLoop", () => {
 			sleep: async () => undefined,
 			threadActionDelayMs: 0,
 			fileExists: async () => false,
+			log: (message) => logs.push(message),
 			warn: (message) => warnings.push(message),
 		});
 
 		expect(postedReplies).toHaveLength(MAX_REPLIES_PER_RUN);
 		expect(postedReplies.at(-1)).toBe(MAX_REPLIES_PER_RUN);
+		expect(logs.at(-1)).toBe(
+			`Reply loop scanned ${MAX_REPLIES_PER_RUN + 2} threads; ${MAX_REPLIES_PER_RUN + 2} actionable follow-up candidates; ${MAX_REPLIES_PER_RUN} replies posted; skipped: 2 follow-ups deferred by the run cap`,
+		);
 		expect(warnings[0]).toContain("avoid comment storms");
 		expect(result).toEqual({
 			scannedThreads: MAX_REPLIES_PER_RUN + 2,

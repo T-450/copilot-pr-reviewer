@@ -6,6 +6,65 @@ import { buildReplyRequest } from "./review.ts";
 export const REPLY_TIMEOUT = 120_000;
 export const MAX_REPLIES_PER_RUN = 25;
 
+type ReplySkipSummary = {
+	duplicateFollowUps: number;
+	emptyReplies: number;
+	failedReplies: number;
+	deferredByRunCap: number;
+};
+
+function pluralize(
+	count: number,
+	singular: string,
+	plural = `${singular}s`,
+): string {
+	return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function buildReplyLoopSummary(options: {
+	readonly scannedThreads: number;
+	readonly actionableThreads: number;
+	readonly repliesPosted: number;
+	readonly skipped: ReplySkipSummary;
+}): string {
+	const skippedReasons: string[] = [];
+
+	if (options.skipped.deferredByRunCap > 0) {
+		skippedReasons.push(
+			`${pluralize(options.skipped.deferredByRunCap, "follow-up")} deferred by the run cap`,
+		);
+	}
+
+	if (options.skipped.duplicateFollowUps > 0) {
+		skippedReasons.push(
+			`${pluralize(options.skipped.duplicateFollowUps, "duplicate follow-up")} already attempted`,
+		);
+	}
+
+	if (options.skipped.emptyReplies > 0) {
+		skippedReasons.push(
+			`${pluralize(options.skipped.emptyReplies, "reply")} returned empty content`,
+		);
+	}
+
+	if (options.skipped.failedReplies > 0) {
+		skippedReasons.push(
+			`${pluralize(options.skipped.failedReplies, "reply")} failed during handling`,
+		);
+	}
+
+	return [
+		`Reply loop scanned ${pluralize(options.scannedThreads, "thread")}`,
+		`${pluralize(options.actionableThreads, "actionable follow-up candidate")}`,
+		`${pluralize(options.repliesPosted, "reply", "replies")} posted`,
+		skippedReasons.length > 0
+			? `skipped: ${skippedReasons.join(", ")}`
+			: undefined,
+	]
+		.filter((part) => part !== undefined)
+		.join("; ");
+}
+
 export function extractAssistantText(response: unknown): string {
 	if (typeof response === "string") {
 		return response.trim();
@@ -125,8 +184,25 @@ export async function runReplyLoop(options: {
 		}
 	>;
 	const threadsToReply = actionableThreads.slice(0, MAX_REPLIES_PER_RUN);
+	const skipped: ReplySkipSummary = {
+		duplicateFollowUps: 0,
+		emptyReplies: 0,
+		failedReplies: 0,
+		deferredByRunCap: Math.max(
+			actionableThreads.length - threadsToReply.length,
+			0,
+		),
+	};
 
 	if (actionableThreads.length === 0) {
+		options.log?.(
+			buildReplyLoopSummary({
+				scannedThreads: threads.length,
+				actionableThreads: 0,
+				repliesPosted: 0,
+				skipped,
+			}),
+		);
 		return {
 			scannedThreads: threads.length,
 			actionableThreads: 0,
@@ -141,7 +217,7 @@ export async function runReplyLoop(options: {
 	}
 
 	options.log?.(
-		`Replying to ${threadsToReply.length} follow-up thread${threadsToReply.length === 1 ? "" : "s"}...`,
+		`Reply loop found ${actionableThreads.length} actionable follow-up candidate${actionableThreads.length === 1 ? "" : "s"}; replying to ${threadsToReply.length} thread${threadsToReply.length === 1 ? "" : "s"}...`,
 	);
 
 	const session = await options.createSession();
@@ -155,6 +231,7 @@ export async function runReplyLoop(options: {
 			try {
 				const replyKey = `${thread.id}:${thread.latestUserFollowUp.id}`;
 				if (attemptedReplyKeys.has(replyKey)) {
+					skipped.duplicateFollowUps += 1;
 					options.warn?.(
 						`##vso[task.logissue type=warning]Skipping duplicate reply attempt for thread ${thread.id} follow-up ${thread.latestUserFollowUp.id}`,
 					);
@@ -180,6 +257,7 @@ export async function runReplyLoop(options: {
 				const replyText = extractAssistantText(rawResponse).trim();
 
 				if (replyText === "") {
+					skipped.emptyReplies += 1;
 					options.warn?.(
 						`##vso[task.logissue type=warning]Reply generation returned empty content for thread ${thread.id}`,
 					);
@@ -195,6 +273,7 @@ export async function runReplyLoop(options: {
 				repliesPosted += 1;
 				await options.sleep(options.threadActionDelayMs);
 			} catch (error) {
+				skipped.failedReplies += 1;
 				options.warn?.(
 					`##vso[task.logissue type=warning]Reply handling failed for thread ${thread.id}: ${error instanceof Error ? error.message : String(error)}`,
 				);
@@ -203,6 +282,15 @@ export async function runReplyLoop(options: {
 	} finally {
 		await session.disconnect();
 	}
+
+	options.log?.(
+		buildReplyLoopSummary({
+			scannedThreads: threads.length,
+			actionableThreads: actionableThreads.length,
+			repliesPosted,
+			skipped,
+		}),
+	);
 
 	return {
 		scannedThreads: threads.length,
