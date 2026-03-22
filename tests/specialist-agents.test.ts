@@ -275,9 +275,7 @@ describe("session config identity and model", () => {
 	});
 
 	test("workingDirectory uses repoRoot when provided", () => {
-		const cfg = buildSessionConfig(
-			makeInputs({ repoRoot: "/custom/path" }),
-		);
+		const cfg = buildSessionConfig(makeInputs({ repoRoot: "/custom/path" }));
 		expect(cfg.workingDirectory).toBe("/custom/path");
 	});
 

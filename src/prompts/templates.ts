@@ -1,7 +1,6 @@
 import type { PRMetadata, ChangedFile } from "../ado/client.ts";
 import type { Config } from "../config.ts";
 import { CHANGE_TYPE_LABELS } from "../types.ts";
-import type { ReviewMode } from "./review-modes.ts";
 
 // ---------------------------------------------------------------------------
 // System prompt — static review contract frame + dynamic PR context
@@ -15,11 +14,7 @@ const REVIEW_CONTRACT_RULES = [
 	"Use categories: correctness, security, reliability, maintainability, testing",
 ];
 
-export function renderSystemPrompt(
-	pr: PRMetadata,
-	config: Config,
-	_mode: ReviewMode = "quick-pass",
-): string {
+export function renderSystemPrompt(pr: PRMetadata, config: Config): string {
 	const sections = [
 		SYSTEM_PREAMBLE,
 		"",
@@ -58,11 +53,7 @@ export function renderSystemPrompt(
 const FILE_REVIEW_INSTRUCTION =
 	"Call `emit_finding` for each issue found. If the file is clean, respond with a brief confirmation and do not call `emit_finding`.";
 
-export function renderFilePrompt(
-	filePath: string,
-	changeType: string,
-	_mode: ReviewMode = "quick-pass",
-): string {
+export function renderFilePrompt(filePath: string, changeType: string): string {
 	return [
 		`Review the following file. Change type: ${changeType}.`,
 		`File: ${filePath}`,
@@ -92,7 +83,6 @@ const PLANNING_CLOSING =
 export function renderPlanningPrompt(
 	pr: PRMetadata,
 	files: readonly ChangedFile[],
-	_mode: ReviewMode = "quick-pass",
 ): string {
 	const fileList = files
 		.map((f) => {

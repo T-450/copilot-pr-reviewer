@@ -10,5 +10,3 @@ export {
 	testAgentConfig,
 	reviewAgents,
 } from "./agents.ts";
-
-export { type ReviewMode, resolveReviewMode } from "./review-modes.ts";

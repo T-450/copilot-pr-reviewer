@@ -7,7 +7,6 @@ import {
 	reviewAgents,
 	securityAgentConfig,
 	testAgentConfig,
-	resolveReviewMode,
 } from "../src/prompts/index.ts";
 import type { PRMetadata, ChangedFile } from "../src/ado/client.ts";
 import type { Config } from "../src/config.ts";
@@ -135,16 +134,6 @@ describe("renderSystemPrompt", () => {
 			expect(prompt).toContain(category);
 		}
 	});
-
-	test("mode parameter defaults to quick-pass without affecting output", () => {
-		const withDefault = renderSystemPrompt(samplePR, defaultConfig);
-		const withExplicit = renderSystemPrompt(
-			samplePR,
-			defaultConfig,
-			"quick-pass",
-		);
-		expect(withDefault).toBe(withExplicit);
-	});
 });
 
 // ── renderFilePrompt ────────────────────────────────────────────────────────
@@ -182,12 +171,6 @@ describe("renderFilePrompt", () => {
 		expect(prompt).not.toContain("import ");
 		expect(prompt).not.toContain("function ");
 		expect(prompt).not.toContain("```");
-	});
-
-	test("mode parameter defaults to quick-pass without affecting output", () => {
-		const withDefault = renderFilePrompt("src/f.ts", "edit");
-		const withExplicit = renderFilePrompt("src/f.ts", "edit", "quick-pass");
-		expect(withDefault).toBe(withExplicit);
 	});
 });
 
@@ -258,25 +241,6 @@ describe("renderPlanningPrompt", () => {
 		expect(prompt).not.toContain("```");
 		expect(prompt).not.toContain("import ");
 		expect(prompt).not.toContain("function ");
-	});
-
-	test("mode parameter defaults to quick-pass without affecting output", () => {
-		const withDefault = renderPlanningPrompt(samplePR, files);
-		const withExplicit = renderPlanningPrompt(samplePR, files, "quick-pass");
-		expect(withDefault).toBe(withExplicit);
-	});
-});
-
-// ── resolveReviewMode ───────────────────────────────────────────────────────
-
-describe("resolveReviewMode", () => {
-	test("returns 'quick-pass'", () => {
-		expect(resolveReviewMode()).toBe("quick-pass");
-	});
-
-	test("return type is assignable to ReviewMode", () => {
-		const mode: ReturnType<typeof resolveReviewMode> = resolveReviewMode();
-		expect(mode).toBe("quick-pass");
 	});
 });
 
