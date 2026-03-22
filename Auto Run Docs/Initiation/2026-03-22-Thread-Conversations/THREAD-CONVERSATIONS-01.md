@@ -11,10 +11,12 @@ This phase adds a fully autonomous prototype for conversational PR threads by te
 
   Notes: captured the audit in `docs/research/thread-conversations/Existing-Review-Thread-Flow-Audit.md`, the minimum ADO payload in `docs/research/thread-conversations/ADO-Thread-Reply-API-Shape.md`, and the runnable prototype outline in `docs/research/thread-conversations/Same-Thread-Reply-Prototype-Plan.md`, all linked from `docs/research/thread-conversations/Thread-Conversations-Hub.md`.
 
-- [ ] Extend Azure DevOps thread retrieval and parsing for conversational prototypes:
+- [x] Extend Azure DevOps thread retrieval and parsing for conversational prototypes:
   - Add types and helpers that can load full thread comment history, author metadata, timestamps, and parent-child relationships needed for reply handling
   - Detect bot-owned review threads and identify the latest actionable user follow-up comment after the bot's most recent reply
   - Reuse existing ADO fetch, retry, and auth patterns instead of creating parallel HTTP helpers
+
+  Notes: extended `src/ado/client.ts` with normalized conversational thread types plus `listReplyCandidateThreads()`, kept `listBotThreads()` on the same fetch/auth path, and added targeted parsing coverage in `tests/ado-client.test.ts` for ordering, follow-up detection, and ignored comments. `npx tsc --noEmit` and `npx biome check src/ado/client.ts tests/ado-client.test.ts` passed; Bun test execution is still blocked in this environment because the `bun` binary is not installed.
 
 - [ ] Add a reply-mode prompt and request builder that preserves thread context:
   - Reuse the current review prompt style and session configuration as the starting point for a follow-up assistant prompt
