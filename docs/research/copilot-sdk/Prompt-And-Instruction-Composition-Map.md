@@ -11,6 +11,8 @@ related:
   - "[[Copilot-SDK-0.2.0-Verified-Capabilities]]"
   - "[[Copilot-SDK-0.2.0-Migration-Decisions]]"
   - "[[Copilot-SDK-Upgrade-Summary]]"
+  - "[[Instruction-And-Skill-Alignment]]"
+  - "[[Phase-02-Prompt-Workflow-Validation-Report]]"
 ---
 
 # Prompt and Instruction Composition Map

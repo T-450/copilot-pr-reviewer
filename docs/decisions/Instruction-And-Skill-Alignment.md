@@ -12,6 +12,7 @@ related:
   - "[[Prompt-And-Instruction-Composition-Map]]"
   - "[[Copilot-SDK-0.2.0-Verified-Capabilities]]"
   - "[[Copilot-SDK-0.2.0-Migration-Decisions]]"
+  - "[[Phase-02-Prompt-Workflow-Validation-Report]]"
 ---
 
 # Instruction and Skill Alignment Decision
