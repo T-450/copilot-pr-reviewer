@@ -29,10 +29,11 @@ This phase turns the upgraded prototype into a maintainable foundation by separa
   - Keep any remaining prompt-injected content only where it is strictly necessary, and document why in code comments or the decision note
   - Completed: Added `buildFileReviewRequest()` to `src/review.ts` returning `MessageOptions` with prompt + `type: "file"` attachment. Refactored `src/index.ts` and `src/prototype.ts` to use it. Fixed `tests/e2e-orchestrator.test.ts` which was the sole remaining path injecting file content directly into prompts (via `Bun.file().text()` + code fences). Added code comments in `src/prompts/templates.ts` documenting why metadata (paths, change types) stays prompt-injected while file content uses attachments. Updated decision note at `docs/decisions/Instruction-And-Skill-Alignment.md` with attachment-first policy. All 141 tests pass, typecheck clean.
 
-- [ ] Write prompt and workflow tests separately from implementation changes:
+- [x] Write prompt and workflow tests separately from implementation changes:
   - Add or update tests for prompt template rendering, instruction directory configuration, and attachment-first request building
   - Assert stable behavior for existing review rules rather than snapshotting unnecessary incidental text
   - Add regression coverage for any workflow or skill-directory configuration introduced in this phase
+  - Completed: Created `tests/prompts.test.ts` with 35 tests covering direct template rendering (`renderSystemPrompt`, `renderFilePrompt`, `renderPlanningPrompt`), `resolveReviewMode()`, `CHANGE_TYPE_LABELS`, and review agent configs (`securityAgentConfig`, `testAgentConfig`, `reviewAgents`). Added 7 `buildFileReviewRequest` tests to `tests/review.test.ts` verifying the attachment-first contract (MessageOptions shape, attachment type/path, no embedded content). Added 4 regression tests to `tests/instructions.test.ts` for `configureBundledInstructionDirs` (env-var setting, ordering, unset handling) and `buildSessionInstructionConfig` (independent objects, mutation safety). Stability assertions verify review contract invariants (required finding fields, valid categories, emit_finding preamble) and the attachment-first principle (no code fences in prompts). All 209 tests pass (up from 190), typecheck clean.
 
 - [ ] Run the relevant tests and verify the refactored review flow still behaves like the prototype:
   - Execute the focused prompt, instruction, and orchestration test suites

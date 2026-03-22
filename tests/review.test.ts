@@ -4,6 +4,7 @@ import {
 	buildFilePrompt,
 	createEmitFindingTool,
 	buildPlanningPrompt,
+	buildFileReviewRequest,
 } from "../src/review.ts";
 import type { PRMetadata, ChangedFile } from "../src/ado/client.ts";
 import type { Config } from "../src/config.ts";
@@ -174,6 +175,89 @@ describe("createEmitFindingTool", () => {
 
 		expect(findings).toHaveLength(0);
 		expect(result).toContain("Invalid");
+	});
+});
+
+describe("buildFileReviewRequest", () => {
+	test("returns prompt and attachments in MessageOptions shape", () => {
+		const request = buildFileReviewRequest(
+			"src/auth.ts",
+			"edit",
+			"/repo/src/auth.ts",
+		);
+
+		expect(request.prompt).toBeDefined();
+		expect(request.attachments).toBeDefined();
+		expect(request.attachments).toHaveLength(1);
+	});
+
+	test("prompt contains file path and change type", () => {
+		const request = buildFileReviewRequest(
+			"src/config.ts",
+			"add",
+			"/repo/src/config.ts",
+		);
+
+		expect(request.prompt).toContain("src/config.ts");
+		expect(request.prompt).toContain("add");
+	});
+
+	test("prompt contains emit_finding instruction", () => {
+		const request = buildFileReviewRequest(
+			"src/f.ts",
+			"edit",
+			"/repo/src/f.ts",
+		);
+
+		expect(request.prompt).toContain("emit_finding");
+	});
+
+	test("attachment has type 'file' and correct absolute path", () => {
+		const absPath = "/home/user/repo/src/auth.ts";
+		const request = buildFileReviewRequest("src/auth.ts", "edit", absPath);
+		const attachment = request.attachments![0];
+
+		expect(attachment.type).toBe("file");
+		expect(attachment.type === "file" && attachment.path).toBe(absPath);
+	});
+
+	test("attachment path is absolute, not relative", () => {
+		const request = buildFileReviewRequest(
+			"src/auth.ts",
+			"edit",
+			"/absolute/path/src/auth.ts",
+		);
+		const attachment = request.attachments![0];
+
+		expect(
+			attachment.type === "file" && attachment.path.startsWith("/"),
+		).toBe(true);
+	});
+
+	test("prompt does not embed file content (attachment-first invariant)", () => {
+		const request = buildFileReviewRequest(
+			"src/auth.ts",
+			"edit",
+			"/repo/src/auth.ts",
+		);
+
+		// Prompt should have metadata only — no code fences, imports, or function defs
+		expect(request.prompt).not.toContain("```");
+		expect(request.prompt).not.toContain("import ");
+		expect(request.prompt).not.toContain("function ");
+	});
+
+	test("works with all change types", () => {
+		for (const changeType of ["add", "edit", "delete", "rename", "unknown"]) {
+			const request = buildFileReviewRequest(
+				"src/f.ts",
+				changeType,
+				"/repo/src/f.ts",
+			);
+
+			expect(request.prompt).toContain(changeType);
+			expect(request.attachments).toHaveLength(1);
+		}
 	});
 });
 

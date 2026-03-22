@@ -79,4 +79,64 @@ describe("buildSessionInstructionConfig", () => {
 		expect(Array.isArray(config.skillDirectories)).toBe(true);
 		expect(Array.isArray(config.disabledSkills)).toBe(true);
 	});
+
+	test("multiple calls return independent objects", () => {
+		const config1 = buildSessionInstructionConfig();
+		const config2 = buildSessionInstructionConfig();
+		expect(config1).toEqual(config2);
+		expect(config1).not.toBe(config2);
+	});
+
+	test("returned arrays are mutable without affecting future calls", () => {
+		const config1 = buildSessionInstructionConfig();
+		config1.skillDirectories.push("/tmp/test-skill");
+		config1.disabledSkills.push("some-skill");
+
+		const config2 = buildSessionInstructionConfig();
+		expect(config2.skillDirectories).toEqual([]);
+		expect(config2.disabledSkills).toEqual([]);
+	});
+});
+
+describe("configureBundledInstructionDirs — regression", () => {
+	test("sets COPILOT_CUSTOM_INSTRUCTIONS_DIRS env var", () => {
+		delete process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS;
+		configureBundledInstructionDirs();
+
+		expect(process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBeDefined();
+	});
+
+	test("bundled root appears first even when env var has existing entries", () => {
+		process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS = [
+			"/first",
+			"/second",
+		].join(delimiter);
+
+		const dirs = configureBundledInstructionDirs();
+		const bundled = getBundledInstructionRoot();
+
+		expect(dirs[0]).toBe(bundled);
+	});
+
+	test("preserves order of existing non-bundled entries", () => {
+		process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS = [
+			"/alpha",
+			"/beta",
+			"/gamma",
+		].join(delimiter);
+
+		const dirs = configureBundledInstructionDirs();
+
+		const withoutBundled = dirs.filter(
+			(d) => d !== getBundledInstructionRoot(),
+		);
+		expect(withoutBundled).toEqual(["/alpha", "/beta", "/gamma"]);
+	});
+
+	test("works when env var is initially unset", () => {
+		delete process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS;
+		const dirs = configureBundledInstructionDirs();
+
+		expect(dirs).toContain(getBundledInstructionRoot());
+	});
 });
