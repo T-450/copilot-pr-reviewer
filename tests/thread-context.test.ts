@@ -107,195 +107,195 @@ describe("sanitizeThreadCommentContent", () => {
 
 		expect(sanitized).toBe("Visible reply");
 	});
+});
 
-	describe("buildReplyCandidateThread", () => {
-		test("assembles finding summary, reply checkpoints, and latest unresolved follow-up", () => {
-			const thread = buildReplyCandidateThread(makeRawThread());
+describe("buildReplyCandidateThread", () => {
+	test("assembles finding summary, reply checkpoints, and latest unresolved follow-up", () => {
+		const thread = buildReplyCandidateThread(makeRawThread());
 
-			expect(thread).not.toBeNull();
-			expect(thread?.fingerprint).toBe("fp-thread");
-			expect(thread?.findingSummary).toContain(
-				"Null branch can bypass the guard",
-			);
-			expect(thread?.answeredCommentIds).toEqual([20]);
-			expect(thread?.latestUserFollowUp?.id).toBe(30);
-			expect(thread?.latestUserFollowUp?.role).toBe("user");
-		});
+		expect(thread).not.toBeNull();
+		expect(thread?.fingerprint).toBe("fp-thread");
+		expect(thread?.findingSummary).toContain(
+			"Null branch can bypass the guard",
+		);
+		expect(thread?.answeredCommentIds).toEqual([20]);
+		expect(thread?.latestUserFollowUp?.id).toBe(30);
+		expect(thread?.latestUserFollowUp?.role).toBe("user");
+	});
 
-		test("keeps chronological order and reply boundaries on normalized comments", () => {
-			const baseComments = makeRawThread().comments;
-			if (!baseComments) {
-				throw new Error("Expected sample comments");
-			}
+	test("keeps chronological order and reply boundaries on normalized comments", () => {
+		const baseComments = makeRawThread().comments;
+		if (!baseComments) {
+			throw new Error("Expected sample comments");
+		}
 
-			const thread = buildReplyCandidateThread(
-				makeRawThread({
-					comments: [
-						baseComments[3],
-						baseComments[0],
-						baseComments[2],
-						baseComments[1],
-					],
-				}),
-			);
+		const thread = buildReplyCandidateThread(
+			makeRawThread({
+				comments: [
+					baseComments[3],
+					baseComments[0],
+					baseComments[2],
+					baseComments[1],
+				],
+			}),
+		);
 
-			expect(thread?.comments.map((comment) => comment.id)).toEqual([
-				10, 20, 25, 30,
-			]);
-			expect(thread?.comments[2]?.replyToCommentId).toBe(20);
-			expect(thread?.comments[2]?.role).toBe("bot");
-		});
+		expect(thread?.comments.map((comment) => comment.id)).toEqual([
+			10, 20, 25, 30,
+		]);
+		expect(thread?.comments[2]?.replyToCommentId).toBe(20);
+		expect(thread?.comments[2]?.role).toBe("bot");
+	});
 
-		test("targets the newest unresolved follow-up when an older comment was answered late", () => {
-			const baseComments = makeRawThread().comments;
-			if (!baseComments) {
-				throw new Error("Expected sample comments");
-			}
+	test("targets the newest unresolved follow-up when an older comment was answered late", () => {
+		const baseComments = makeRawThread().comments;
+		if (!baseComments) {
+			throw new Error("Expected sample comments");
+		}
 
-			const thread = buildReplyCandidateThread(
-				makeRawThread({
-					comments: [
-						baseComments[0],
-						baseComments[1],
-						baseComments[3],
-						{
-							id: 35,
-							parentCommentId: 10,
-							content: [
-								"Answering the earlier clarification only.",
-								"",
-								"---",
-								"<sub>Follow-up from Copilot PR Reviewer</sub>",
-								"",
-								"<!-- copilot-pr-reviewer-reply -->",
-								"<!-- in-reply-to:20 -->",
-							].join("\n"),
-							publishedDate: "2026-03-22T12:05:00.000Z",
-							lastUpdatedDate: "2026-03-22T12:05:00.000Z",
-							isDeleted: false,
-							author: {
-								id: "bot-1",
-								displayName: "Copilot Reviewer",
-								uniqueName: "bot@example.com",
-								isContainer: false,
-							},
+		const thread = buildReplyCandidateThread(
+			makeRawThread({
+				comments: [
+					baseComments[0],
+					baseComments[1],
+					baseComments[3],
+					{
+						id: 35,
+						parentCommentId: 10,
+						content: [
+							"Answering the earlier clarification only.",
+							"",
+							"---",
+							"<sub>Follow-up from Copilot PR Reviewer</sub>",
+							"",
+							"<!-- copilot-pr-reviewer-reply -->",
+							"<!-- in-reply-to:20 -->",
+						].join("\n"),
+						publishedDate: "2026-03-22T12:05:00.000Z",
+						lastUpdatedDate: "2026-03-22T12:05:00.000Z",
+						isDeleted: false,
+						author: {
+							id: "bot-1",
+							displayName: "Copilot Reviewer",
+							uniqueName: "bot@example.com",
+							isContainer: false,
 						},
-					],
-				}),
-			);
+					},
+				],
+			}),
+		);
 
-			expect(thread?.answeredCommentIds).toEqual([20]);
-			expect(thread?.latestUserFollowUp?.id).toBe(30);
-		});
+		expect(thread?.answeredCommentIds).toEqual([20]);
+		expect(thread?.latestUserFollowUp?.id).toBe(30);
+	});
 
-		test("suppresses duplicate replies when the newest user follow-up already has a checkpoint", () => {
-			const baseComments = makeRawThread().comments;
-			if (!baseComments) {
-				throw new Error("Expected sample comments");
-			}
+	test("suppresses duplicate replies when the newest user follow-up already has a checkpoint", () => {
+		const baseComments = makeRawThread().comments;
+		if (!baseComments) {
+			throw new Error("Expected sample comments");
+		}
 
-			const thread = buildReplyCandidateThread(
-				makeRawThread({
-					comments: [
-						baseComments[0],
-						baseComments[1],
-						{
-							id: 30,
-							parentCommentId: 10,
-							content: "Does that still apply after the fallback change?",
-							publishedDate: "2026-03-22T12:04:00.000Z",
-							lastUpdatedDate: "2026-03-22T12:04:00.000Z",
-							isDeleted: false,
-							author: {
-								id: "user-2",
-								displayName: "Lin Reviewer",
-								uniqueName: "lin@example.com",
-								isContainer: false,
-							},
+		const thread = buildReplyCandidateThread(
+			makeRawThread({
+				comments: [
+					baseComments[0],
+					baseComments[1],
+					{
+						id: 30,
+						parentCommentId: 10,
+						content: "Does that still apply after the fallback change?",
+						publishedDate: "2026-03-22T12:04:00.000Z",
+						lastUpdatedDate: "2026-03-22T12:04:00.000Z",
+						isDeleted: false,
+						author: {
+							id: "user-2",
+							displayName: "Lin Reviewer",
+							uniqueName: "lin@example.com",
+							isContainer: false,
 						},
-						{
-							id: 35,
-							parentCommentId: 10,
-							content: [
-								"Yes, it still applies after the fallback change.",
-								"",
-								"---",
-								"<sub>Follow-up from Copilot PR Reviewer</sub>",
-								"",
-								"<!-- copilot-pr-reviewer-reply -->",
-								"<!-- in-reply-to:30 -->",
-							].join("\n"),
-							publishedDate: "2026-03-22T12:05:00.000Z",
-							lastUpdatedDate: "2026-03-22T12:05:00.000Z",
-							isDeleted: false,
-							author: {
-								id: "bot-1",
-								displayName: "Copilot Reviewer",
-								uniqueName: "bot@example.com",
-								isContainer: false,
-							},
+					},
+					{
+						id: 35,
+						parentCommentId: 10,
+						content: [
+							"Yes, it still applies after the fallback change.",
+							"",
+							"---",
+							"<sub>Follow-up from Copilot PR Reviewer</sub>",
+							"",
+							"<!-- copilot-pr-reviewer-reply -->",
+							"<!-- in-reply-to:30 -->",
+						].join("\n"),
+						publishedDate: "2026-03-22T12:05:00.000Z",
+						lastUpdatedDate: "2026-03-22T12:05:00.000Z",
+						isDeleted: false,
+						author: {
+							id: "bot-1",
+							displayName: "Copilot Reviewer",
+							uniqueName: "bot@example.com",
+							isContainer: false,
 						},
-					],
-				}),
-			);
+					},
+				],
+			}),
+		);
 
-			expect(thread?.answeredCommentIds).toEqual([30]);
-			expect(thread?.latestUserFollowUp).toBeNull();
-		});
+		expect(thread?.answeredCommentIds).toEqual([30]);
+		expect(thread?.latestUserFollowUp).toBeNull();
+	});
 
-		test("keeps edited follow-up text and renders marker-only bot replies as empty transcript entries", () => {
-			const baseComments = makeRawThread().comments;
-			if (!baseComments) {
-				throw new Error("Expected sample comments");
-			}
+	test("keeps edited follow-up text and renders marker-only bot replies as empty transcript entries", () => {
+		const baseComments = makeRawThread().comments;
+		if (!baseComments) {
+			throw new Error("Expected sample comments");
+		}
 
-			const thread = buildReplyCandidateThread(
-				makeRawThread({
-					comments: [
-						{
-							...baseComments[3],
-							id: 31,
-							content:
-								"I re-ran the logout flow. Does `readUserId()` still dereference `session.user` after the fallback change?",
-							publishedDate: "2026-03-22T12:06:00.000Z",
-							lastUpdatedDate: "2026-03-22T12:07:00.000Z",
-						},
-						{
-							...baseComments[2],
-							content: [
-								"---",
-								"<sub>Follow-up from Copilot PR Reviewer</sub>",
-								"",
-								"<!-- copilot-pr-reviewer-reply -->",
-								"<!-- in-reply-to:20 -->",
-							].join("\n"),
-						},
-						baseComments[0],
-						baseComments[1],
-					],
-				}),
-			);
+		const thread = buildReplyCandidateThread(
+			makeRawThread({
+				comments: [
+					{
+						...baseComments[3],
+						id: 31,
+						content:
+							"I re-ran the logout flow. Does `readUserId()` still dereference `session.user` after the fallback change?",
+						publishedDate: "2026-03-22T12:06:00.000Z",
+						lastUpdatedDate: "2026-03-22T12:07:00.000Z",
+					},
+					{
+						...baseComments[2],
+						content: [
+							"---",
+							"<sub>Follow-up from Copilot PR Reviewer</sub>",
+							"",
+							"<!-- copilot-pr-reviewer-reply -->",
+							"<!-- in-reply-to:20 -->",
+						].join("\n"),
+					},
+					baseComments[0],
+					baseComments[1],
+				],
+			}),
+		);
 
-			expect(thread?.comments.map((comment) => comment.id)).toEqual([
-				10, 20, 25, 31,
-			]);
-			expect(thread?.comments[2]?.body).toBe("");
-			expect(thread?.latestUserFollowUp?.id).toBe(31);
-			expect(thread?.latestUserFollowUp?.body).toContain("fallback change");
-			expect(thread?.latestUserFollowUp?.lastUpdatedDate).toBe(
-				"2026-03-22T12:07:00.000Z",
-			);
+		expect(thread?.comments.map((comment) => comment.id)).toEqual([
+			10, 20, 25, 31,
+		]);
+		expect(thread?.comments[2]?.body).toBe("");
+		expect(thread?.latestUserFollowUp?.id).toBe(31);
+		expect(thread?.latestUserFollowUp?.body).toContain("fallback change");
+		expect(thread?.latestUserFollowUp?.lastUpdatedDate).toBe(
+			"2026-03-22T12:07:00.000Z",
+		);
 
-			if (thread === null) {
-				throw new Error("Expected thread to normalize");
-			}
+		if (thread === null) {
+			throw new Error("Expected thread to normalize");
+		}
 
-			const transcript = buildThreadTranscript(thread.comments);
-			expect(transcript).toContain("Copilot Reviewer: (empty comment)");
-			expect(transcript).toContain(
-				"Lin Reviewer: I re-ran the logout flow. Does `readUserId()` still dereference `session.user` after the fallback change?",
-			);
-		});
+		const transcript = buildThreadTranscript(thread.comments);
+		expect(transcript).toContain("Copilot Reviewer: (empty comment)");
+		expect(transcript).toContain(
+			"Lin Reviewer: I re-ran the logout flow. Does `readUserId()` still dereference `session.user` after the fallback change?",
+		);
 	});
 
 	test("returns null for threads without any bot marker comment", () => {
