@@ -162,7 +162,7 @@ describe("createEmitFindingTool", () => {
 				title: "Test",
 				message: "Test message",
 				confidence: "high",
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			} as any,
 			{
 				sessionId: "test",

@@ -20,7 +20,12 @@ import type { Finding } from "../src/types.ts";
 
 // ── Shared test helpers ─────────────────────────────────────────────────────
 
-const inv = { sessionId: "test-session", toolCallId: "tc1", toolName: "emit_finding", arguments: {} };
+const inv = {
+	sessionId: "test-session",
+	toolCallId: "tc1",
+	toolName: "emit_finding",
+	arguments: {},
+};
 
 function validFindingArgs(overrides: Record<string, unknown> = {}) {
 	return {
@@ -94,8 +99,14 @@ describe("defineTool() migration — tool contract", () => {
 		const findings: Finding[] = [];
 		const tool = createEmitFindingTool(findings);
 
-		await tool.handler(validFindingArgs({ filePath: "a.ts", title: "Issue 1" }), inv);
-		await tool.handler(validFindingArgs({ filePath: "b.ts", title: "Issue 2" }), inv);
+		await tool.handler(
+			validFindingArgs({ filePath: "a.ts", title: "Issue 1" }),
+			inv,
+		);
+		await tool.handler(
+			validFindingArgs({ filePath: "b.ts", title: "Issue 2" }),
+			inv,
+		);
 
 		expect(findings).toHaveLength(2);
 		expect(findings[0].filePath).toBe("a.ts");
@@ -255,7 +266,11 @@ describe("attachment-based review requests", () => {
 	});
 
 	test("system prompt includes review contract for attachment-based review", () => {
-		const pr = { title: "Test PR", description: "Test", workItemIds: [] as number[] };
+		const pr = {
+			title: "Test PR",
+			description: "Test",
+			workItemIds: [] as number[],
+		};
 		const config = {
 			ignore: [],
 			severityThreshold: "suggestion" as const,
@@ -331,10 +346,7 @@ describe("reasoning mode selection", () => {
 	});
 
 	test("quoted string values parse correctly", async () => {
-		await writeFile(
-			join(tmpDir, ".prreviewer.yml"),
-			'reasoningEffort: "low"',
-		);
+		await writeFile(join(tmpDir, ".prreviewer.yml"), 'reasoningEffort: "low"');
 		const config = await loadConfig(join(tmpDir, ".prreviewer.yml"));
 		expect(config.reasoningEffort).toBe("low");
 	});
@@ -347,7 +359,13 @@ describe("hook wiring — onPreToolUse denials", () => {
 
 	test("denies all five destructive tools with a reason mentioning the tool name", () => {
 		const hook = createPreToolUseHook();
-		const deniedTools = ["edit_file", "write_file", "shell", "git_push", "web_fetch"];
+		const deniedTools = [
+			"edit_file",
+			"write_file",
+			"shell",
+			"git_push",
+			"web_fetch",
+		];
 
 		for (const toolName of deniedTools) {
 			const result = hook(
@@ -362,7 +380,12 @@ describe("hook wiring — onPreToolUse denials", () => {
 	test("allows read-only and custom tools", () => {
 		const hook = createPreToolUseHook();
 
-		for (const toolName of ["read_file", "list_files", "search_files", "emit_finding"]) {
+		for (const toolName of [
+			"read_file",
+			"list_files",
+			"search_files",
+			"emit_finding",
+		]) {
 			const result = hook(
 				{ timestamp: Date.now(), cwd: "/tmp", toolName, toolArgs: {} },
 				hookInv,
@@ -376,7 +399,10 @@ describe("hook wiring — onPreToolUse denials", () => {
 
 describe("hook wiring — onPostToolUse test companions", () => {
 	const hookInv = { sessionId: "test-session" };
-	const toolResult = { textResultForLlm: "code", resultType: "success" as const };
+	const toolResult = {
+		textResultForLlm: "code",
+		resultType: "success" as const,
+	};
 
 	test("maps src/ paths to tests/ for companion hint", async () => {
 		const hook = createPostToolUseHook();
@@ -444,7 +470,24 @@ describe("hook wiring — onPostToolUse test companions", () => {
 
 	test("recognizes all supported source extensions", async () => {
 		const hook = createPostToolUseHook();
-		const exts = [".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java", ".cs", ".rb", ".php", ".swift", ".kt", ".c", ".cpp", ".h"];
+		const exts = [
+			".ts",
+			".tsx",
+			".js",
+			".jsx",
+			".py",
+			".go",
+			".rs",
+			".java",
+			".cs",
+			".rb",
+			".php",
+			".swift",
+			".kt",
+			".c",
+			".cpp",
+			".h",
+		];
 
 		for (const ext of exts) {
 			const result = await hook(
@@ -501,7 +544,11 @@ describe("hook wiring — onUserPromptSubmitted guard", () => {
 		const hook = createUserPromptSubmittedHook();
 		// biome-ignore lint: testing runtime undefined guard
 		const result = hook(
-			{ timestamp: Date.now(), cwd: "/tmp", prompt: undefined as unknown as string },
+			{
+				timestamp: Date.now(),
+				cwd: "/tmp",
+				prompt: undefined as unknown as string,
+			},
 			hookInv,
 		);
 		expect(result?.suppressOutput).toBe(true);
@@ -510,7 +557,11 @@ describe("hook wiring — onUserPromptSubmitted guard", () => {
 	test("passes through prompt with meaningful content", () => {
 		const hook = createUserPromptSubmittedHook();
 		const result = hook(
-			{ timestamp: Date.now(), cwd: "/tmp", prompt: "Review src/auth.ts for security issues" },
+			{
+				timestamp: Date.now(),
+				cwd: "/tmp",
+				prompt: "Review src/auth.ts for security issues",
+			},
 			hookInv,
 		);
 		expect(result).toBeUndefined();
@@ -619,14 +670,24 @@ describe("createHooks() aggregation", () => {
 
 		// PreToolUse denies write_file
 		const preResult = hooks.onPreToolUse!(
-			{ timestamp: Date.now(), cwd: "/tmp", toolName: "write_file", toolArgs: {} },
+			{
+				timestamp: Date.now(),
+				cwd: "/tmp",
+				toolName: "write_file",
+				toolArgs: {},
+			},
 			hookInv,
 		);
 		expect(preResult).toBeDefined();
 
 		// PreToolUse allows read_file
 		const allowResult = hooks.onPreToolUse!(
-			{ timestamp: Date.now(), cwd: "/tmp", toolName: "read_file", toolArgs: {} },
+			{
+				timestamp: Date.now(),
+				cwd: "/tmp",
+				toolName: "read_file",
+				toolArgs: {},
+			},
 			hookInv,
 		);
 		expect(allowResult).toBeUndefined();

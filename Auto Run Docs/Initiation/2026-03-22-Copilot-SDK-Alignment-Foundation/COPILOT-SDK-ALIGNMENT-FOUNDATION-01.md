@@ -45,7 +45,8 @@ This phase upgrades the project to `@github/copilot-sdk` `0.2.0`, verifies the r
   - Add assertions that preserve current orchestration behavior rather than broad rewrites of expected outcomes
   - Completed: `tests/session-wiring.test.ts` adds 47 focused tests across 10 describe blocks covering defineTool() contract and schema validation (19 tests), attachment-based review shape (4 tests), reasoningEffort config parsing for all 4 enum values plus fallback (7 tests), and comprehensive hook wiring for all 6 hooks including edge cases (17 tests). All 136 tests pass, typecheck clean.
 
-- [ ] Run validation and capture the working-prototype result:
+- [x] Run validation and capture the working-prototype result:
   - Run targeted tests first, then the broader relevant Bun test suites, and fix any regressions introduced by the upgrade
   - Execute the prototype command or integration path to confirm the upgraded flow works from session creation through findings collection
   - Write a structured validation report with YAML front matter summarizing commands run, results, remaining gaps, and links to the research and decision notes
+  - Completed: All 136 tests pass (0 regressions), typecheck clean, Biome auto-fixed 7 files (19 pre-existing warnings remain). Prototype token gate verified. Validation report at `docs/research/copilot-sdk/Copilot-SDK-0.2.0-Validation-Report.md`

@@ -79,7 +79,7 @@ const SAMPLE_FILES: Record<string, string> = {
 		"}",
 		"",
 		"export function buildQuery(table: string, filter: string): string {",
-		'  return `SELECT * FROM ${table} WHERE ${filter}`;',
+		"  return `SELECT * FROM ${table} WHERE ${filter}`;",
 		"}",
 	].join("\n"),
 };
@@ -144,7 +144,11 @@ async function scaffoldTempDir(): Promise<string> {
 function printFindingsSummary(
 	findings: readonly Finding[],
 	config: Config,
-	clusters: readonly { primary: Finding; members: readonly Finding[]; isClustered: boolean }[],
+	clusters: readonly {
+		primary: Finding;
+		members: readonly Finding[];
+		isClustered: boolean;
+	}[],
 ): void {
 	const reportable = findings.filter((f) =>
 		meetsThreshold(f.severity, config.severityThreshold),
@@ -223,13 +227,11 @@ async function runPrototype(): Promise<void> {
 		workItemIds: [101],
 	};
 
-	const files: ChangedFile[] = Object.keys(SAMPLE_FILES).map(
-		(path, idx) => ({
-			path,
-			changeType: 1,
-			changeTrackingId: idx + 1,
-		}),
-	);
+	const files: ChangedFile[] = Object.keys(SAMPLE_FILES).map((path, idx) => ({
+		path,
+		changeType: 1,
+		changeTrackingId: idx + 1,
+	}));
 
 	// 3. Create Copilot SDK session
 	console.log("\n[3/6] Creating Copilot SDK session...");
@@ -309,9 +311,7 @@ async function runPrototype(): Promise<void> {
 			const newFindings = findings.filter(
 				(f) => f.filePath === file.path || f.filePath.endsWith(file.path),
 			);
-			console.log(
-				`  => ${newFindings.length} findings (${fileMs}ms)`,
-			);
+			console.log(`  => ${newFindings.length} findings (${fileMs}ms)`);
 		}
 		const reviewMs = Math.round(performance.now() - reviewStart);
 		console.log(`  All files reviewed (${reviewMs}ms total)`);

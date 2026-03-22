@@ -78,14 +78,14 @@ export type SessionHooks = {
 	onUserPromptSubmitted?: (
 		input: UserPromptSubmittedInput,
 		inv: Invocation,
-	) => Promise<UserPromptSubmittedOutput | void> | UserPromptSubmittedOutput | void;
+	) =>
+		| Promise<UserPromptSubmittedOutput | void>
+		| UserPromptSubmittedOutput
+		| void;
 	onErrorOccurred?: (
 		input: ErrorOccurredInput,
 		inv: Invocation,
-	) =>
-		| Promise<ErrorOccurredOutput | void>
-		| ErrorOccurredOutput
-		| void;
+	) => Promise<ErrorOccurredOutput | void> | ErrorOccurredOutput | void;
 	onSessionEnd?: (
 		input: SessionEndInput,
 		inv: Invocation,
