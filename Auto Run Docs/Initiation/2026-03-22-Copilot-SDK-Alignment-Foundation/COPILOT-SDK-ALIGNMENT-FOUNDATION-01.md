@@ -39,10 +39,11 @@ This phase upgrades the project to `@github/copilot-sdk` `0.2.0`, verifies the r
   - Make the output visibly useful: show per-file review progress, streaming updates, and a final findings summary
   - Completed: `src/prototype.ts` created as standalone script, `bun run prototype` command added. Scaffolds temp dir with 3 sample files (hardcoded secrets, missing null checks, SQL injection), creates session with all 0.2.0 features (defineTool, reasoningEffort, hooks, streaming, attachments), runs planning → per-file review → clustering → formatted summary. Typecheck clean, 89 tests pass.
 
-- [ ] Write focused tests for the upgraded tool and session wiring:
+- [x] Write focused tests for the upgraded tool and session wiring:
   - Cover the `defineTool()` migration, attachment-based review requests, reasoning mode selection, and the newly wired hooks
   - Keep test additions separate from production changes and follow the repo’s existing Bun test style
   - Add assertions that preserve current orchestration behavior rather than broad rewrites of expected outcomes
+  - Completed: `tests/session-wiring.test.ts` adds 47 focused tests across 10 describe blocks covering defineTool() contract and schema validation (19 tests), attachment-based review shape (4 tests), reasoningEffort config parsing for all 4 enum values plus fallback (7 tests), and comprehensive hook wiring for all 6 hooks including edge cases (17 tests). All 136 tests pass, typecheck clean.
 
 - [ ] Run validation and capture the working-prototype result:
   - Run targeted tests first, then the broader relevant Bun test suites, and fix any regressions introduced by the upgrade
