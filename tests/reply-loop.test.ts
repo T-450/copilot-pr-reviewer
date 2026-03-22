@@ -232,7 +232,7 @@ describe("runReplyLoop", () => {
 			repoRoot: "/repo",
 			listThreads: async () => [makeThread({ id: 70 })],
 			createSession: async () => ({
-				sendAndWait: async () => ({ message: { content: "   " } }),
+				sendAndWait: async () => "",
 				disconnect: async () => {
 					disconnected = true;
 				},
