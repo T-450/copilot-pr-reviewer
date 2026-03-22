@@ -15,6 +15,9 @@ related:
   - "[[Thread-Conversation-Memory-Model]]"
   - "[[Production-Reply-Loop-Orchestration-Order]]"
   - "[[Phase-02-Production-Reply-Loop-Validation-Report]]"
+  - "[[Phase-03-Context-Memory-Validation-Report]]"
+  - "[[Phase-04-Release-Readiness-Validation-Report]]"
+  - "[[Thread-Conversations-Implementation-Summary]]"
   - "[[Copilot-SDK-Foundation-Implementation-Summary]]"
 ---
 
@@ -32,6 +35,8 @@ This hub links the Phase 01 research needed to add same-thread conversational re
 - [[Production-Reply-Loop-Orchestration-Order]] - Phase 02 execution order for placing live reply handling alongside planning, reconcile, thread mutation, and feedback collection.
 - [[Phase-02-Production-Reply-Loop-Validation-Report]] - production reply-loop readiness, full test evidence, prototype revalidation, and current known limits.
 - [[Phase-03-Context-Memory-Validation-Report]] - Phase 03 validation evidence for transcript rehydration, reply checkpoints, latest-follow-up targeting, and current thread-memory limits.
+- [[Phase-04-Release-Readiness-Validation-Report]] - final hardening validation for regressions, operational logging, prototype re-checks, and rollout readiness.
+- [[Thread-Conversations-Implementation-Summary]] - concise feature history linking architecture, memory decisions, all validation reports, and follow-on extension hooks.
 
 ## Phase 01 Scope
 
