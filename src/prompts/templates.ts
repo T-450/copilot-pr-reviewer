@@ -1,9 +1,6 @@
-import type {
-	PRMetadata,
-	ChangedFile,
-	ReplyCandidateThread,
-} from "../ado/client.ts";
+import type { PRMetadata, ChangedFile } from "../ado/client.ts";
 import type { Config } from "../config.ts";
+import type { ReplyCandidateThread } from "../thread-context.ts";
 import { CHANGE_TYPE_LABELS } from "../types.ts";
 
 // ---------------------------------------------------------------------------

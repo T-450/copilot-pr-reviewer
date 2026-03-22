@@ -10,10 +10,11 @@ This phase strengthens the conversational feature so replies remain grounded acr
   - Create a structured decision note under `docs/decisions/` with YAML front matter and wiki-links comparing transcript-only context vs persisted reply metadata and stating the chosen implementation
   - Completed in `docs/decisions/Thread-Conversation-Memory-Model.md`; chose transcript rehydration with persisted in-thread reply metadata checkpoints instead of adding external state.
 
-- [ ] Implement thread context assembly as a dedicated, testable layer:
+- [x] Implement thread context assembly as a dedicated, testable layer:
   - Add helpers that transform raw Azure DevOps thread comments into a normalized conversation model suitable for prompt construction and duplicate detection
   - Preserve ordering, author roles, and reply boundaries so the assistant can answer the latest user follow-up with the full local context
   - Reuse existing domain types and avoid embedding Azure DevOps response shapes deep inside prompt logic
+  - Completed in `src/thread-context.ts`, with `src/ado/client.ts` reusing the new normalization layer and focused coverage added in `tests/thread-context.test.ts`.
 
 - [ ] Improve reply generation quality with explicit conversational constraints:
   - Update prompt templates or helper renderers so follow-up replies reference the original issue, answer the latest question directly, and avoid restating the full finding unless it helps clarify the answer

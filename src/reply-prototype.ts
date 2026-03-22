@@ -6,11 +6,15 @@ import {
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ReplyCandidateThread } from "./ado/client.ts";
 import { createHooks } from "./hooks.ts";
 import { configureBundledInstructionDirs } from "./instructions.ts";
 import { extractAssistantText } from "./reply-loop.ts";
 import { buildReplyRequest } from "./review.ts";
+import {
+	buildReplyCandidateThread,
+	type RawAdoThread,
+	type ReplyCandidateThread,
+} from "./thread-context.ts";
 
 export { extractAssistantText } from "./reply-loop.ts";
 
@@ -63,30 +67,10 @@ export type ReplyPrototypeResult = ReplyPrototypePreparation & {
 type ReplyResponder = (request: MessageOptions) => Promise<unknown>;
 
 function createSampleReplyCandidateThread(): ReplyCandidateThread {
-	return {
+	const thread = {
 		id: 701,
-		filePath: SAMPLE_FILE_PATH,
-		fingerprint: "reply-prototype-fp",
 		status: 1,
-		rootBotCommentId: 10,
-		botAuthorId: "bot-1",
-		latestBotReplyAt: "2026-03-22T13:03:00.000Z",
-		latestUserFollowUp: {
-			id: 30,
-			parentCommentId: 10,
-			content:
-				"Can you explain why the null branch is still risky if `canUseFallback()` already checks `session.user`?",
-			publishedDate: "2026-03-22T13:04:00.000Z",
-			lastUpdatedDate: "2026-03-22T13:04:00.000Z",
-			isDeleted: false,
-			author: {
-				id: "user-2",
-				displayName: "Ada Reviewer",
-				uniqueName: "ada@example.com",
-				isContainer: false,
-			},
-			isBot: false,
-		},
+		threadContext: { filePath: SAMPLE_FILE_PATH },
 		comments: [
 			{
 				id: 10,
@@ -101,7 +85,6 @@ function createSampleReplyCandidateThread(): ReplyCandidateThread {
 					uniqueName: "bot@example.com",
 					isContainer: false,
 				},
-				isBot: true,
 			},
 			{
 				id: 20,
@@ -117,7 +100,6 @@ function createSampleReplyCandidateThread(): ReplyCandidateThread {
 					uniqueName: "lin@example.com",
 					isContainer: false,
 				},
-				isBot: false,
 			},
 			{
 				id: 25,
@@ -133,7 +115,6 @@ function createSampleReplyCandidateThread(): ReplyCandidateThread {
 					uniqueName: "bot@example.com",
 					isContainer: false,
 				},
-				isBot: true,
 			},
 			{
 				id: 30,
@@ -149,10 +130,16 @@ function createSampleReplyCandidateThread(): ReplyCandidateThread {
 					uniqueName: "ada@example.com",
 					isContainer: false,
 				},
-				isBot: false,
 			},
 		],
-	};
+	} satisfies RawAdoThread;
+
+	const normalized = buildReplyCandidateThread(thread);
+	if (normalized === null) {
+		throw new Error("Sample reply thread failed to normalize");
+	}
+
+	return normalized;
 }
 
 async function scaffoldReplyPrototypeDir(): Promise<{

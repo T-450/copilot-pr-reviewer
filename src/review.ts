@@ -8,12 +8,15 @@ import type { PRMetadata, ChangedFile } from "./ado/client.ts";
 import type { Config } from "./config.ts";
 import type { Finding, Severity, Category, Confidence } from "./types.ts";
 import {
+	buildThreadTranscript,
+	type ReplyCandidateThread,
+} from "./thread-context.ts";
+import {
 	renderSystemPrompt,
 	renderFilePrompt,
 	renderPlanningPrompt,
 	renderReplyPrompt,
 } from "./prompts/index.ts";
-import type { ReplyCandidateThread, ThreadComment } from "./ado/client.ts";
 
 export const FindingArgsSchema = z.object({
 	filePath: z.string(),
@@ -100,48 +103,16 @@ type ReplyRequestOptions = {
 	readonly changeContext?: string;
 };
 
-function sanitizeThreadCommentContent(content: string): string {
-	return content
-		.split("\n")
-		.filter(
-			(line) =>
-				line.trim() !== "<!-- copilot-pr-reviewer-bot -->" &&
-				!line.trim().startsWith("<!-- fingerprint:") &&
-				line.trim() !== "<sub>Was this helpful? React with 👍 or 👎</sub>",
-		)
-		.join("\n")
-		.replace(/\n?---\n?/g, "\n")
-		.trim();
-}
-
-function formatTranscriptComment(comment: ThreadComment): string {
-	const author = comment.author.displayName || (comment.isBot ? "Bot" : "User");
-	const timestamp = comment.publishedDate || "unknown-time";
-	const content =
-		sanitizeThreadCommentContent(comment.content) || "(empty comment)";
-	return `[${timestamp}] ${author}: ${content}`;
-}
-
 export function buildReplyPrompt(options: ReplyRequestOptions): string {
-	const rootComment =
-		options.thread.comments.find(
-			(comment) => comment.id === options.thread.rootBotCommentId,
-		) ?? options.thread.comments[0];
-	const findingSummary = rootComment
-		? sanitizeThreadCommentContent(rootComment.content)
-		: "Original finding summary unavailable.";
 	const latestUserPrompt = options.thread.latestUserFollowUp
-		? sanitizeThreadCommentContent(options.thread.latestUserFollowUp.content)
+		? options.thread.latestUserFollowUp.body
 		: "No actionable user follow-up was detected.";
-	const threadTranscript = options.thread.comments
-		.map(formatTranscriptComment)
-		.join("\n\n");
 
 	return renderReplyPrompt({
 		thread: options.thread,
-		findingSummary,
+		findingSummary: options.thread.findingSummary,
 		latestUserPrompt,
-		threadTranscript,
+		threadTranscript: buildThreadTranscript(options.thread.comments),
 		changeContext: options.changeContext,
 	});
 }

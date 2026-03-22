@@ -17,13 +17,18 @@ function makeThread(
 		status: overrides.status ?? 1,
 		rootBotCommentId: overrides.rootBotCommentId ?? 100,
 		botAuthorId: overrides.botAuthorId ?? "bot-1",
+		findingSummary:
+			overrides.findingSummary ?? "Original finding summary unavailable.",
 		latestBotReplyAt: overrides.latestBotReplyAt ?? "2026-03-22T12:00:00.000Z",
+		latestBotCheckpoint: overrides.latestBotCheckpoint ?? null,
+		answeredCommentIds: overrides.answeredCommentIds ?? [],
 		latestUserFollowUp:
 			overrides.latestUserFollowUp === undefined
 				? {
 						id: 200,
 						parentCommentId: 100,
 						content: "Can you clarify the null guard?",
+						body: "Can you clarify the null guard?",
 						publishedDate: "2026-03-22T12:05:00.000Z",
 						lastUpdatedDate: "2026-03-22T12:05:00.000Z",
 						isDeleted: false,
@@ -34,6 +39,8 @@ function makeThread(
 							isContainer: false,
 						},
 						isBot: false,
+						role: "user",
+						replyToCommentId: null,
 					}
 				: overrides.latestUserFollowUp,
 		comments: overrides.comments ?? [],
@@ -49,6 +56,8 @@ function makeFollowUp(
 		id: overrides.id ?? 200,
 		parentCommentId: overrides.parentCommentId ?? 100,
 		content: overrides.content ?? "Can you clarify the null guard?",
+		body:
+			overrides.body ?? overrides.content ?? "Can you clarify the null guard?",
 		publishedDate: overrides.publishedDate ?? "2026-03-22T12:05:00.000Z",
 		lastUpdatedDate:
 			overrides.lastUpdatedDate ??
@@ -62,6 +71,8 @@ function makeFollowUp(
 			isContainer: false,
 		},
 		isBot: overrides.isBot ?? false,
+		role: overrides.role ?? "user",
+		replyToCommentId: overrides.replyToCommentId ?? null,
 	};
 }
 

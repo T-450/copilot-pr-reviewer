@@ -1,4 +1,19 @@
 import type { Finding } from "../types.ts";
+import {
+	BOT_MARKER,
+	REPLY_MARKER,
+	buildReplyCandidateThread,
+	type RawAdoThread,
+	type ReplyCandidateThread,
+} from "../thread-context.ts";
+
+export type {
+	RawAdoComment,
+	RawAdoThread,
+	ReplyCandidateThread,
+	ThreadComment,
+	ThreadCommentAuthor,
+} from "../thread-context.ts";
 
 export type ChangedFile = {
 	readonly path: string;
@@ -13,58 +28,6 @@ export type BotThread = {
 	readonly status: number;
 };
 
-export type ThreadCommentAuthor = {
-	readonly id: string;
-	readonly displayName: string;
-	readonly uniqueName: string;
-	readonly isContainer: boolean;
-};
-
-export type ThreadComment = {
-	readonly id: number;
-	readonly parentCommentId: number;
-	readonly content: string;
-	readonly publishedDate: string;
-	readonly lastUpdatedDate: string;
-	readonly isDeleted: boolean;
-	readonly author: ThreadCommentAuthor;
-	readonly isBot: boolean;
-};
-
-export type ReplyCandidateThread = {
-	readonly id: number;
-	readonly filePath: string;
-	readonly fingerprint: string;
-	readonly status: number;
-	readonly rootBotCommentId: number;
-	readonly botAuthorId: string;
-	readonly comments: readonly ThreadComment[];
-	readonly latestBotReplyAt: string;
-	readonly latestUserFollowUp: ThreadComment | null;
-};
-
-type ADOComment = {
-	readonly id?: number;
-	readonly parentCommentId?: number;
-	readonly content?: string;
-	readonly publishedDate?: string;
-	readonly lastUpdatedDate?: string;
-	readonly isDeleted?: boolean;
-	readonly author?: {
-		readonly id?: string;
-		readonly displayName?: string;
-		readonly uniqueName?: string;
-		readonly isContainer?: boolean;
-	};
-};
-
-type ADOThread = {
-	readonly id: number;
-	readonly status: number;
-	readonly threadContext?: { readonly filePath?: string };
-	readonly comments?: readonly ADOComment[];
-};
-
 type ReconcileResult = {
 	readonly pendingThreads: ReadonlyArray<{
 		finding: Finding;
@@ -73,9 +36,6 @@ type ReconcileResult = {
 	readonly threadsForReview: readonly number[];
 };
 
-const BOT_MARKER = "<!-- copilot-pr-reviewer-bot -->";
-const REPLY_MARKER = "<!-- copilot-pr-reviewer-reply -->";
-const FINGERPRINT_RE = /<!-- fingerprint:([^\s]+) -->/;
 const REPLY_METADATA_RE =
 	/<!--\s*(?:copilot-pr-reviewer-bot|copilot-pr-reviewer-reply|fingerprint:[^>]+|in-reply-to:\d+)\s*-->/g;
 
@@ -125,101 +85,9 @@ function authHeaders(): Record<string, string> {
 
 const MAX_RETRIES = 3;
 
-function parseTimestamp(value: string): number {
-	const parsed = Date.parse(value);
-	return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-function compareThreadComments(a: ThreadComment, b: ThreadComment): number {
-	return (
-		parseTimestamp(a.publishedDate) - parseTimestamp(b.publishedDate) ||
-		a.id - b.id
-	);
-}
-
-function normalizeThreadComment(
-	comment: ADOComment,
-	botAuthorId: string,
-): ThreadComment {
-	const authorId = comment.author?.id ?? "";
-	return {
-		id: comment.id ?? 0,
-		parentCommentId: comment.parentCommentId ?? 0,
-		content: comment.content ?? "",
-		publishedDate: comment.publishedDate ?? "",
-		lastUpdatedDate: comment.lastUpdatedDate ?? comment.publishedDate ?? "",
-		isDeleted: comment.isDeleted ?? false,
-		author: {
-			id: authorId,
-			displayName: comment.author?.displayName ?? "Unknown",
-			uniqueName: comment.author?.uniqueName ?? "",
-			isContainer: comment.author?.isContainer ?? false,
-		},
-		isBot: authorId !== "" && authorId === botAuthorId,
-	};
-}
-
-function isActionableUserComment(comment: ThreadComment): boolean {
-	return !comment.isDeleted && comment.content.trim() !== "" && !comment.isBot;
-}
-
-function toReplyCandidateThread(
-	thread: ADOThread,
-): ReplyCandidateThread | null {
-	const rootBotComment = (thread.comments ?? []).find((comment) =>
-		(comment.content ?? "").includes(BOT_MARKER),
-	);
-	if (!rootBotComment) {
-		return null;
-	}
-
-	const rootContent = rootBotComment.content ?? "";
-	const fingerprint = rootContent.match(FINGERPRINT_RE)?.[1] ?? "";
-	const botAuthorId = rootBotComment.author?.id ?? "";
-	const comments = (thread.comments ?? [])
-		.map((comment) => normalizeThreadComment(comment, botAuthorId))
-		.sort(compareThreadComments);
-
-	const latestBotReplyAt = comments
-		.filter((comment) => comment.isBot)
-		.reduce(
-			(latest, comment) =>
-				parseTimestamp(comment.publishedDate) > parseTimestamp(latest)
-					? comment.publishedDate
-					: latest,
-			rootBotComment.publishedDate ?? "",
-		);
-
-	const latestUserFollowUp = comments
-		.filter(
-			(comment) =>
-				isActionableUserComment(comment) &&
-				parseTimestamp(comment.publishedDate) >
-					parseTimestamp(latestBotReplyAt),
-		)
-		.reduce<ThreadComment | null>((latest, comment) => {
-			if (latest === null) {
-				return comment;
-			}
-			return compareThreadComments(latest, comment) < 0 ? comment : latest;
-		}, null);
-
-	return {
-		id: thread.id,
-		filePath: thread.threadContext?.filePath ?? "",
-		fingerprint,
-		status: thread.status,
-		rootBotCommentId: rootBotComment.id ?? 0,
-		botAuthorId,
-		comments,
-		latestBotReplyAt,
-		latestUserFollowUp,
-	};
-}
-
-async function fetchThreads(): Promise<readonly ADOThread[]> {
+async function fetchThreads(): Promise<readonly RawAdoThread[]> {
 	const base = baseUrl();
-	const threads = await adoFetch<{ value: ADOThread[] }>(`${base}/threads`);
+	const threads = await adoFetch<{ value: RawAdoThread[] }>(`${base}/threads`);
 	return threads.value;
 }
 
@@ -331,7 +199,7 @@ export async function fetchIterationDiff(): Promise<IterationDiff> {
 export async function listBotThreads(): Promise<readonly BotThread[]> {
 	const threads = await fetchThreads();
 	return threads
-		.map(toReplyCandidateThread)
+		.map(buildReplyCandidateThread)
 		.filter((thread): thread is ReplyCandidateThread => thread !== null)
 		.map((thread) => ({
 			id: thread.id,
@@ -346,7 +214,7 @@ export async function listReplyCandidateThreads(): Promise<
 > {
 	const threads = await fetchThreads();
 	return threads
-		.map(toReplyCandidateThread)
+		.map(buildReplyCandidateThread)
 		.filter((thread): thread is ReplyCandidateThread => thread !== null);
 }
 
