@@ -17,10 +17,11 @@ This phase turns the upgraded prototype into a maintainable foundation by separa
   - Keep all new template paths easy to test and easy to reference from session setup
   - Completed: Created `src/prompts/` module with four files: `templates.ts` (named template constants + `renderSystemPrompt`, `renderFilePrompt`, `renderPlanningPrompt`), `agents.ts` (security-reviewer and test-reviewer sub-agent configs extracted from index.ts), `review-modes.ts` (`ReviewMode` union type with `resolveReviewMode()`), and `index.ts` barrel export. Refactored `src/review.ts` to delegate to template render functions via thin wrappers preserving the existing API. Refactored `src/index.ts` to import `reviewAgents` from the prompts module. All 136 tests pass, typecheck clean.
 
-- [ ] Align bundled instructions and skills/workflows with the verified SDK surface:
+- [x] Align bundled instructions and skills/workflows with the verified SDK surface:
   - Reuse the existing bundled instruction directory logic before adding new loading behavior
   - Replace environment-only assumptions with code that explicitly configures the verified `skillDirectories` and related session options if they are needed for the review workflow
   - Add a structured decision note explaining which review behavior remains in prompt templates, which moves to SDK-managed skills or workflows, and why
+  - Completed: Added `buildSessionInstructionConfig()` to `src/instructions.ts` returning explicit `skillDirectories: []` and `disabledSkills: []` — spread into `createSession()` in `src/index.ts`. Kept `configureBundledInstructionDirs()` for env-var instruction loading (only SDK mechanism). Decision note at `docs/decisions/Instruction-And-Skill-Alignment.md` covering all 10 review behaviors and their placement rationale. 5 new tests, all 141 pass, typecheck clean.
 
 - [ ] Implement attachment-first review inputs consistently across executable paths:
   - Search for any tests, fixtures, or helper flows that still inject whole file contents directly into prompts

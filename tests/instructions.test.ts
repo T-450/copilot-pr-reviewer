@@ -3,6 +3,8 @@ import { delimiter } from "node:path";
 import {
 	configureBundledInstructionDirs,
 	getBundledInstructionRoot,
+	buildSessionInstructionConfig,
+	type SessionInstructionConfig,
 } from "../src/instructions.ts";
 
 const ORIGINAL_DIRS = process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS;
@@ -41,5 +43,40 @@ describe("configureBundledInstructionDirs", () => {
 		expect(
 			dirs.filter((entry) => entry === getBundledInstructionRoot()),
 		).toHaveLength(1);
+	});
+});
+
+describe("buildSessionInstructionConfig", () => {
+	test("returns skillDirectories as empty array", () => {
+		const config = buildSessionInstructionConfig();
+		expect(config.skillDirectories).toEqual([]);
+	});
+
+	test("returns disabledSkills as empty array", () => {
+		const config = buildSessionInstructionConfig();
+		expect(config.disabledSkills).toEqual([]);
+	});
+
+	test("returns only the expected keys", () => {
+		const config = buildSessionInstructionConfig();
+		const keys = Object.keys(config).sort();
+		expect(keys).toEqual(["disabledSkills", "skillDirectories"]);
+	});
+
+	test("config is spreadable into session options", () => {
+		const config = buildSessionInstructionConfig();
+		const sessionOpts = {
+			model: "gpt-4.1",
+			...config,
+		};
+		expect(sessionOpts.skillDirectories).toEqual([]);
+		expect(sessionOpts.disabledSkills).toEqual([]);
+		expect(sessionOpts.model).toBe("gpt-4.1");
+	});
+
+	test("satisfies SessionInstructionConfig type shape", () => {
+		const config: SessionInstructionConfig = buildSessionInstructionConfig();
+		expect(Array.isArray(config.skillDirectories)).toBe(true);
+		expect(Array.isArray(config.disabledSkills)).toBe(true);
 	});
 });

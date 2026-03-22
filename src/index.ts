@@ -20,7 +20,10 @@ import {
 	createEmitFindingTool,
 } from "./review.ts";
 import { createHooks } from "./hooks.ts";
-import { configureBundledInstructionDirs } from "./instructions.ts";
+import {
+	configureBundledInstructionDirs,
+	buildSessionInstructionConfig,
+} from "./instructions.ts";
 import { clusterFindings } from "./cluster.ts";
 import { CHANGE_TYPE_LABELS, type Finding } from "./types.ts";
 import { reviewAgents } from "./prompts/index.ts";
@@ -97,6 +100,7 @@ async function main(): Promise<void> {
 	);
 
 	configureBundledInstructionDirs();
+	const instructionConfig = buildSessionInstructionConfig();
 
 	const client = new CopilotClient({
 		cwd: process.env.REPO_ROOT ?? process.cwd(),
@@ -129,6 +133,7 @@ async function main(): Promise<void> {
 			content: buildSystemPrompt(pr, config),
 			mode: "append",
 		},
+		...instructionConfig,
 		onPermissionRequest: approveAll,
 		onEvent: createStreamingHandler(),
 		workingDirectory: process.env.REPO_ROOT ?? process.cwd(),
