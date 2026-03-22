@@ -31,6 +31,7 @@ This hub links the Phase 01 research needed to add same-thread conversational re
 - [[Thread-Conversation-Memory-Model]] - Phase 03 decision note defining what per-thread memory must be preserved and why thread metadata is preferred over external persistence.
 - [[Production-Reply-Loop-Orchestration-Order]] - Phase 02 execution order for placing live reply handling alongside planning, reconcile, thread mutation, and feedback collection.
 - [[Phase-02-Production-Reply-Loop-Validation-Report]] - production reply-loop readiness, full test evidence, prototype revalidation, and current known limits.
+- [[Phase-03-Context-Memory-Validation-Report]] - Phase 03 validation evidence for transcript rehydration, reply checkpoints, latest-follow-up targeting, and current thread-memory limits.
 
 ## Phase 01 Scope
 

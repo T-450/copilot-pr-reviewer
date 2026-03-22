@@ -34,7 +34,8 @@ This phase strengthens the conversational feature so replies remain grounded acr
   - Keep these tests separate from validation runs and include edge cases such as missing bot marker content, edited comments, and mixed user/bot reply order
   - Completed in `tests/thread-context.test.ts`, `tests/review.test.ts`, and `tests/ado-client.test.ts`; added coverage for edited follow-ups, marker-only bot replies, multi-turn prompt rendering, and ADO thread normalization while keeping validation/reporting for the next task.
 
-- [ ] Validate multi-turn context retention and record the outcome:
+- [x] Validate multi-turn context retention and record the outcome:
   - Run the relevant test suites and typecheck; fix issues in small, isolated changes before closing the phase
   - Exercise the prototype or a dedicated harness with multi-turn sample threads to confirm the bot answers follow-up questions with the right local context
   - Write a structured validation report with YAML front matter linking to the memory decision note and documenting what level of thread memory is now supported
+  - Completed in `docs/research/thread-conversations/Phase-03-Context-Memory-Validation-Report.md`; validated with `npm exec --yes bun -- test`, `npm exec --yes bun -- run typecheck`, and `npm exec --yes bun -- run prototype:reply`, confirming transcript rehydration, checkpoint-based duplicate suppression, and newest-follow-up targeting in controlled multi-turn thread flows.
