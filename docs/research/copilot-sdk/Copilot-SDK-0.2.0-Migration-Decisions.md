@@ -12,6 +12,7 @@ related:
   - '[[Copilot-SDK-0.2.0-Verified-Capabilities]]'
   - '[[Copilot-SDK-DefineAgent-Verification]]'
   - '[[Copilot-SDK-Upgrade-Summary]]'
+  - '[[Phase-03-Specialist-Migration-Validation-Report]]'
 ---
 
 # Copilot SDK 0.2.0 Migration Decisions

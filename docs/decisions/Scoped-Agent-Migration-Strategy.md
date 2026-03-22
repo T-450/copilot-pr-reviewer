@@ -12,6 +12,7 @@ related:
   - "[[Copilot-SDK-0.2.0-Verified-Capabilities]]"
   - "[[Instruction-And-Skill-Alignment]]"
   - "[[Prompt-And-Instruction-Composition-Map]]"
+  - "[[Phase-03-Specialist-Migration-Validation-Report]]"
 ---
 
 # Scoped Agent Migration Strategy
@@ -129,9 +130,36 @@ The selected strategy requires minimal code changes since `customAgents` is alre
 4. Add focused tests for agent registration, tool scoping, and fallback behavior
 5. Document the `infer` mechanism behavior in code comments where non-obvious
 
+## Implementation Outcome
+
+The selected strategy was fully implemented and validated in Phase 03. Key artifacts:
+
+### Source modules
+
+| Module | Purpose |
+|--------|---------|
+| `src/prompts/agents.ts` | Canonical specialist agent configs (`securityAgentConfig`, `testAgentConfig`, `reviewAgents`) with shared `SPECIALIST_TOOLS` constant |
+| `src/session.ts` | Pure `buildSessionConfig()` function — wires agents, tools, exclusions, and hooks into a `SessionConfig` without creating a session |
+
+### Test coverage
+
+| Test file | Tests | Scope |
+|-----------|-------|-------|
+| `tests/specialist-agents.test.ts` | 28 | Specialist registration (6), tool scope (6), session exclusions (3), fallback/override (5), session identity (6), exclusion coherence (2) |
+| `tests/session-wiring.test.ts` | 47 | `defineTool()` contract, attachments, reasoning effort, hook wiring, and session config structure |
+
+### Final validation
+
+- **237 tests pass** (7 expected skips, 0 failures) across 11 test files
+- TypeScript strict mode clean (`tsc --noEmit` — zero errors)
+- See `[[Phase-03-Specialist-Migration-Validation-Report]]` for the complete validation report
+
 ## Sources
 
 - SDK types: `node_modules/@github/copilot-sdk/dist/types.d.ts` lines 585-619 (`CustomAgentConfig`), lines 727-733 (`customAgents`, `agent`)
 - SDK docs: `Auto Run Docs/Working/copilot-sdk-0.2.0/package/docs/agent-author.md`, `extensions.md`
 - Prior research: `docs/research/copilot-sdk/Copilot-SDK-DefineAgent-Verification.md`
 - Prior decision: `docs/decisions/Instruction-And-Skill-Alignment.md`
+- Implementation: `src/session.ts`, `src/prompts/agents.ts`
+- Tests: `tests/specialist-agents.test.ts`, `tests/session-wiring.test.ts`
+- Validation report: `docs/research/copilot-sdk/Phase-03-Specialist-Migration-Validation-Report.md`

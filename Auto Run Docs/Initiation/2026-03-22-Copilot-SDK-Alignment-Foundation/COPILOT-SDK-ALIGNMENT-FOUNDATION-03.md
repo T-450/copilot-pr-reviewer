@@ -32,7 +32,8 @@ This phase replaces the current inline sub-agent setup with the nearest verified
   - Add at least one regression test proving the main reviewer still works when specialist logic is disabled or bypassed
   - **Done:** Added `tests/specialist-agents.test.ts` with 28 focused tests across 7 describe blocks: specialist registration (6 tests), allowed-tool scope (6 tests), session-level exclusion (3 tests), fallback/override behavior (5 tests including empty-agents regression), session identity/model wiring (6 tests), and specialist+session exclusion coherence (2 tests). All 237 tests pass, typecheck clean.
 
-- [ ] Run specialist migration validation and update the knowledge artifacts:
+- [x] Run specialist migration validation and update the knowledge artifacts:
   - Execute the targeted tests for agent configuration and orchestration
   - Fix any regressions in session startup, tool scoping, or findings flow before closing the phase
   - Update the structured research and decision notes with the final supported agent approach and links to the implementation and test coverage
+  - **Done:** All 237 tests pass (0 regressions), typecheck clean. Created `docs/research/copilot-sdk/Phase-03-Specialist-Migration-Validation-Report.md` with full validation results. Updated `docs/decisions/Scoped-Agent-Migration-Strategy.md` with implementation outcome (source modules, test coverage, final validation stats). Cross-linked migration decisions and decision record to the Phase 03 validation report.
