@@ -15,8 +15,8 @@ import {
 } from "./ado/client.ts";
 import {
 	buildSystemPrompt,
-	buildFilePrompt,
 	buildPlanningPrompt,
+	buildFileReviewRequest,
 	createEmitFindingTool,
 } from "./review.ts";
 import { createHooks } from "./hooks.ts";
@@ -151,15 +151,13 @@ async function main(): Promise<void> {
 		const repoRoot = process.env.REPO_ROOT ?? process.cwd();
 		for (const file of filesToReview) {
 			const changeLabel = CHANGE_TYPE_LABELS[file.changeType] ?? "unknown";
-			const absolutePath = `${repoRoot}/${file.path}`;
-			const prompt = buildFilePrompt(file.path, changeLabel);
-
 			console.log(`  Reviewing ${file.path} (${changeLabel})...`);
 			await session.sendAndWait(
-				{
-					prompt,
-					attachments: [{ type: "file", path: absolutePath }],
-				},
+				buildFileReviewRequest(
+					file.path,
+					changeLabel,
+					`${repoRoot}/${file.path}`,
+				),
 				REVIEW_TIMEOUT,
 			);
 		}

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { loadConfig, meetsThreshold } from "../src/config.ts";
 import {
 	buildSystemPrompt,
-	buildFilePrompt,
+	buildFileReviewRequest,
 	buildPlanningPrompt,
 	createEmitFindingTool,
 } from "../src/review.ts";
@@ -141,21 +141,15 @@ describe.skipIf(!HAS_TOKEN)("E2E orchestrator flow", () => {
 			expect(planResponse).toBeDefined();
 			console.log("Planning complete");
 
-			// 6. Review each file
+			// 6. Review each file using attachment-first requests (file content
+			//    is delivered via SDK attachment, not injected into the prompt).
 			for (const file of files) {
 				const label = file.changeType === 1 ? "add" : "edit";
-				const content = await Bun.file(join(tmpDir, file.path)).text();
-				const prompt = [
-					buildFilePrompt(file.path, label),
-					"",
-					"```typescript",
-					content,
-					"```",
-					"",
-					"You MUST call emit_finding for each issue. The hardcoded secret in auth.ts is a critical security issue.",
-				].join("\n");
 				console.log(`  Reviewing ${file.path}...`);
-				await session.sendAndWait({ prompt }, 60_000);
+				await session.sendAndWait(
+					buildFileReviewRequest(file.path, label, join(tmpDir, file.path)),
+					60_000,
+				);
 			}
 
 			// 7. Filter by threshold

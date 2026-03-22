@@ -84,14 +84,35 @@ Setting `skillDirectories: []` explicitly in `buildSessionInstructionConfig()` d
 | Secrets file scrutiny | `.github/instructions/secrets.instructions.md` | SDK instruction discovery (glob-scoped) | Static, file-scoped, SDK-native |
 | PR context & review contract | `src/prompts/templates.ts` → `renderSystemPrompt()` | `systemMessage` session option | Dynamic — interpolates PR metadata + config |
 | Review planning | `src/prompts/templates.ts` → `renderPlanningPrompt()` | `session.sendAndWait()` prompt | Dynamic — interpolates file list |
-| Per-file review instruction | `src/prompts/templates.ts` → `renderFilePrompt()` | `session.sendAndWait()` prompt + attachment | Dynamic — file path + change type |
+| Per-file review instruction | `src/review.ts` → `buildFileReviewRequest()` | `session.sendAndWait()` prompt + `type: "file"` attachment | Dynamic — prompt has path + change type; attachment has file content |
 | Security specialist | `src/prompts/agents.ts` → `securityAgentConfig` | `customAgents` session option | Tool-scoped, prompt-isolated |
 | Test specialist | `src/prompts/agents.ts` → `testAgentConfig` | `customAgents` session option | Tool-scoped, prompt-isolated |
 | Test companion hints | `src/hooks.ts` → `createPostToolUseHook()` | `onPostToolUse` hook | Runtime-contextual, depends on tool args |
 | Automated session framing | `src/hooks.ts` → `createSessionStartHook()` | `onSessionStart` hook | Reinforces automated context at session start |
+
+## Decision: Attachment-First File Review Inputs
+
+**Status:** All executable paths use `buildFileReviewRequest()` from `src/review.ts`.
+
+**Rationale:** The SDK `MessageOptions.attachments` array accepts `{ type: "file", path }` entries that the SDK tokenises and manages within the context window natively. Embedding file content directly in prompt text wastes prompt tokens, bypasses SDK context management, and creates a maintenance divergence between production and test paths.
+
+**Policy:**
+
+1. **File content → attachment.** Every per-file review request uses `buildFileReviewRequest()`, which pairs a contextual prompt (path, change type, review instructions) with a `type: "file"` attachment. No path should read file content and inject it into prompt text.
+2. **Metadata → prompt.** File paths, change-type labels, PR title/description, and review instructions remain prompt-injected because they are structural metadata the model needs before seeing the file content.
+3. **Planning prompt is metadata-only.** `renderPlanningPrompt()` includes file paths and change labels but never file contents — files are not attached during planning because the model is only producing a review order, not reviewing code.
+
+**What changed:**
+
+- `src/review.ts` — added `buildFileReviewRequest()` returning `MessageOptions` with prompt + attachment.
+- `src/index.ts` — refactored per-file loop to use `buildFileReviewRequest()`.
+- `src/prototype.ts` — same refactor.
+- `tests/e2e-orchestrator.test.ts` — **converted from inline content injection** (reading files via `Bun.file()` and embedding in code fences) to `buildFileReviewRequest()` with native attachments.
+- `tests/sdk-integration.test.ts` — already used attachments, no change needed.
 
 ## When to Revisit
 
 - If the SDK adds an `instructionDirs` property to `SessionConfig`, migrate `configureBundledInstructionDirs()` to use it.
 - If the reviewer gains interactive modes (e.g., a developer asks for a deeper review on specific files), skills may become appropriate.
 - If sub-agent prompts grow complex enough to warrant file-based management, consider skill directories.
+- If the SDK adds diff-aware attachment types (e.g., `type: "diff"`), consider using them for the per-file review to give the model change hunks rather than whole files.

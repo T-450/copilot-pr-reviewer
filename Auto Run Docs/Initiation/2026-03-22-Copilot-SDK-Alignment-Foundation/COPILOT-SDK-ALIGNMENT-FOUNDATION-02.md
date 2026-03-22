@@ -23,10 +23,11 @@ This phase turns the upgraded prototype into a maintainable foundation by separa
   - Add a structured decision note explaining which review behavior remains in prompt templates, which moves to SDK-managed skills or workflows, and why
   - Completed: Added `buildSessionInstructionConfig()` to `src/instructions.ts` returning explicit `skillDirectories: []` and `disabledSkills: []` — spread into `createSession()` in `src/index.ts`. Kept `configureBundledInstructionDirs()` for env-var instruction loading (only SDK mechanism). Decision note at `docs/decisions/Instruction-And-Skill-Alignment.md` covering all 10 review behaviors and their placement rationale. 5 new tests, all 141 pass, typecheck clean.
 
-- [ ] Implement attachment-first review inputs consistently across executable paths:
+- [x] Implement attachment-first review inputs consistently across executable paths:
   - Search for any tests, fixtures, or helper flows that still inject whole file contents directly into prompts
   - Convert those paths to use whole-file native attachments where the SDK supports it, while preserving clear prompt context about change type and review expectations
   - Keep any remaining prompt-injected content only where it is strictly necessary, and document why in code comments or the decision note
+  - Completed: Added `buildFileReviewRequest()` to `src/review.ts` returning `MessageOptions` with prompt + `type: "file"` attachment. Refactored `src/index.ts` and `src/prototype.ts` to use it. Fixed `tests/e2e-orchestrator.test.ts` which was the sole remaining path injecting file content directly into prompts (via `Bun.file().text()` + code fences). Added code comments in `src/prompts/templates.ts` documenting why metadata (paths, change types) stays prompt-injected while file content uses attachments. Updated decision note at `docs/decisions/Instruction-And-Skill-Alignment.md` with attachment-first policy. All 141 tests pass, typecheck clean.
 
 - [ ] Write prompt and workflow tests separately from implementation changes:
   - Add or update tests for prompt template rendering, instruction directory configuration, and attachment-first request building

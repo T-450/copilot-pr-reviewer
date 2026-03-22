@@ -19,8 +19,8 @@ import { tmpdir } from "node:os";
 import { loadConfig, meetsThreshold, type Config } from "./config.ts";
 import {
 	buildSystemPrompt,
-	buildFilePrompt,
 	buildPlanningPrompt,
+	buildFileReviewRequest,
 	createEmitFindingTool,
 } from "./review.ts";
 import { createHooks } from "./hooks.ts";
@@ -288,22 +288,17 @@ async function runPrototype(): Promise<void> {
 		const planMs = Math.round(performance.now() - planStart);
 		console.log(`  Planning complete (${planMs}ms)`);
 
-		// 5. Review each file with attachments and streaming
+		// 5. Review each file with attachment-first requests
 		console.log("\n[5/6] Reviewing files...");
 		const reviewStart = performance.now();
 		for (const file of files) {
 			const changeLabel = CHANGE_TYPE_LABELS[file.changeType] ?? "unknown";
-			const absolutePath = join(tmpDir, file.path);
-			const prompt = buildFilePrompt(file.path, changeLabel);
 
 			const fileStart = performance.now();
 			process.stdout.write(`  ${file.path} (${changeLabel}) `);
 
 			await session.sendAndWait(
-				{
-					prompt,
-					attachments: [{ type: "file", path: absolutePath }],
-				},
+				buildFileReviewRequest(file.path, changeLabel, join(tmpDir, file.path)),
 				REVIEW_TIMEOUT,
 			);
 

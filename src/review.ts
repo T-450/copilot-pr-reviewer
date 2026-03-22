@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool, type Tool } from "@github/copilot-sdk";
+import { defineTool, type Tool, type MessageOptions } from "@github/copilot-sdk";
 import type { PRMetadata, ChangedFile } from "./ado/client.ts";
 import type { Config } from "./config.ts";
 import {
@@ -91,4 +91,27 @@ export function buildPlanningPrompt(
 	files: readonly ChangedFile[],
 ): string {
 	return renderPlanningPrompt(pr, files);
+}
+
+/**
+ * Build an attachment-first review request for a single file.
+ *
+ * Returns a complete `MessageOptions` payload that pairs a contextual prompt
+ * (file path, change type, review instructions) with a native SDK file
+ * attachment. The SDK handles tokenisation and context-window management for
+ * the attachment, so file content is never injected into the prompt text.
+ *
+ * @param filePath  Repo-relative path (e.g. "src/auth.ts")
+ * @param changeType  Human-readable change label ("add", "edit", …)
+ * @param absolutePath  Fully-resolved filesystem path for the SDK attachment
+ */
+export function buildFileReviewRequest(
+	filePath: string,
+	changeType: string,
+	absolutePath: string,
+): MessageOptions {
+	return {
+		prompt: renderFilePrompt(filePath, changeType),
+		attachments: [{ type: "file", path: absolutePath }],
+	};
 }

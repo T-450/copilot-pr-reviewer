@@ -44,6 +44,10 @@ export function renderSystemPrompt(
 
 // ---------------------------------------------------------------------------
 // File review prompt — per-file instruction with change context
+//
+// Prompt-injected content: file path, change type, and review instructions.
+// File content is delivered via a native SDK file attachment (see
+// buildFileReviewRequest in review.ts), NOT embedded in the prompt text.
 // ---------------------------------------------------------------------------
 
 const FILE_REVIEW_INSTRUCTION =
@@ -64,6 +68,11 @@ export function renderFilePrompt(
 
 // ---------------------------------------------------------------------------
 // Planning prompt — review strategy before per-file passes
+//
+// Prompt-injected content: file paths and change-type labels.
+// This is metadata (not file content) needed for the model to plan review
+// order before any files are attached. File contents are never included here;
+// they arrive later via per-file attachment-first requests.
 // ---------------------------------------------------------------------------
 
 const PLANNING_TASK_ITEMS = [
