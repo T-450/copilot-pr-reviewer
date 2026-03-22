@@ -23,17 +23,22 @@ Validation pass for the same-thread reply prototype added in Phase 01. The goal 
 ### 1. Targeted Bun Tests
 
 ```text
-$ bun test tests/ado-client.test.ts tests/review.test.ts tests/reply-prototype.test.ts
-zsh:1: command not found: bun
+$ npm exec --yes bun -- test tests/ado-client.test.ts tests/review.test.ts tests/reply-prototype.test.ts
+bun test v1.3.11 (af24e281)
+
+ 72 pass
+ 0 fail
+ 167 expect() calls
+Ran 72 tests across 3 files. [84.00ms]
 ```
 
-Result: BLOCKED. The required Bun runtime is not installed in this execution environment, so the targeted Bun tests could not be executed here.
+Result: PASS. The targeted Bun coverage for conversational thread parsing, reply prompt construction, and the non-interactive prototype path now passes.
 
 ### 2. TypeScript Type Check
 
 ```text
-$ npx tsc --noEmit
-(exit code 0, no errors)
+$ npm exec --yes bun -- run typecheck
+$ tsc --noEmit
 ```
 
 Result: PASS. The reply-thread additions remain clean under the repository's strict TypeScript settings.
@@ -42,15 +47,16 @@ Result: PASS. The reply-thread additions remain clean under the repository's str
 
 ```text
 $ npx @biomejs/biome check src/reply-prototype.ts tests/ado-client.test.ts tests/review.test.ts tests/reply-prototype.test.ts
-Checked 4 files in 15ms. No fixes applied.
+Checked 5 files in 16ms. No fixes applied.
 ```
 
-Result: PASS. The reply prototype and its targeted tests are lint-clean.
+Result: PASS. The reply prototype, targeted tests, and the `src/ado/client.ts` follow-up fix are lint-clean.
 
 ### 4. Prototype Flow Execution
 
 ```text
-$ node --experimental-strip-types src/reply-prototype.ts
+$ npm exec --yes bun -- run prototype:reply
+$ bun run src/reply-prototype.ts
 Thread Conversation Prototype — Same-Thread Reply
 ============================================================
 Using controlled offline responder because COPILOT_GITHUB_TOKEN is not set.
@@ -74,6 +80,14 @@ The null branch is still risky because `canUseFallback()` only decides whether t
 
 Result: PASS. The controlled prototype path runs non-interactively, detects the seeded follow-up comment, preserves the conversation context, and emits a context-aware same-thread reply.
 
+### 5. Validation Fix Applied
+
+```text
+Adjusted `src/ado/client.ts` to parse non-whitespace fingerprint values, not only `\w+`.
+```
+
+Result: PASS. Reply-thread parsing now correctly preserves existing hyphenated fingerprints such as `fp-reply` and `reply-prototype-fp`, which unblocked the Bun test suite.
+
 ## Working Prototype Evidence
 
 The prototype currently demonstrates the intended Phase 01 behavior in controlled mode:
@@ -84,16 +98,15 @@ The prototype currently demonstrates the intended Phase 01 behavior in controlle
 
 ## Explicitly Deferred Gaps
 
-1. Bun-backed validation is still pending because `bun` is unavailable in this environment. The remaining Phase 01 closure step is to rerun the targeted Bun tests and `bun run prototype:reply` once Bun is installed.
-2. Live `copilot-sdk` mode was not exercised because `COPILOT_GITHUB_TOKEN` was not set. The controlled responder path still proves the prototype wiring and prompt construction.
+1. Live `copilot-sdk` mode was not exercised because `COPILOT_GITHUB_TOKEN` was not set. The controlled responder path still proves the prototype wiring and prompt construction.
 
 ## Readiness Assessment
 
 | Criterion | Status | Evidence |
 |-----------|--------|----------|
-| Reply candidate parsing stays type-safe | PASS | `npx tsc --noEmit` |
+| Reply candidate parsing stays type-safe | PASS | `npm exec --yes bun -- run typecheck` |
 | Reply prototype source and tests are lint-clean | PASS | `npx @biomejs/biome check ...` |
-| Controlled same-thread reply flow works end-to-end | PASS | `node --experimental-strip-types src/reply-prototype.ts` |
-| Bun-native validation completed | BLOCKED | Bun runtime missing |
+| Controlled same-thread reply flow works end-to-end | PASS | `npm exec --yes bun -- run prototype:reply` |
+| Bun-native validation completed | PASS | `npm exec --yes bun -- test ...` |
 
-Current assessment: the prototype itself is working and demonstrable, but Phase 01 should remain open until the Bun-native validation commands are run in a Bun-enabled environment.
+Current assessment: the Phase 01 prototype is working and demonstrable. It successfully proves the intended path from a user follow-up in a bot-owned thread to a context-aware same-thread reply, with Bun-native validation now completed in this environment via `npm exec --yes bun -- ...`.

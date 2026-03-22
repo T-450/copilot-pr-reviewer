@@ -35,7 +35,7 @@ This audit captures the minimum existing behavior that the conversational protot
 The current implementation already has the two identifiers the prototype should preserve:
 
 - **Bot marker:** `src/ado/client.ts:24` defines `BOT_MARKER` as `<!-- copilot-pr-reviewer-bot -->`.
-- **Fingerprint marker:** `src/ado/client.ts:25` defines `FINGERPRINT_RE` as `/<!-- fingerprint:(\w+) -->/`.
+- **Fingerprint marker:** `src/ado/client.ts:77` defines `FINGERPRINT_RE` as `/<!-- fingerprint:([^\s]+) -->/`.
 
 These markers are appended by `formatThreadBody()` in `src/ado/client.ts:220`, which means reply mode can recover the original finding identity from the thread body without inventing a second metadata channel.
 

@@ -74,7 +74,7 @@ type ReconcileResult = {
 };
 
 const BOT_MARKER = "<!-- copilot-pr-reviewer-bot -->";
-const FINGERPRINT_RE = /<!-- fingerprint:(\w+) -->/;
+const FINGERPRINT_RE = /<!-- fingerprint:([^\s]+) -->/;
 
 const BINARY_EXTS = new Set([
 	".png",
