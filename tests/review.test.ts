@@ -447,6 +447,20 @@ describe("buildReplyRequest", () => {
 		}
 	});
 
+	test("keeps the prompt attachment-first and excludes raw bot markers", () => {
+		const request = buildReplyRequest({
+			thread: sampleReplyThread,
+			absolutePath: "/repo/src/auth.ts",
+		});
+
+		expect(request.prompt).toContain(
+			"Can you explain why the null branch is still risky?",
+		);
+		expect(request.prompt).not.toContain("<!-- copilot-pr-reviewer-bot -->");
+		expect(request.prompt).not.toContain("<!-- fingerprint:fp-123 -->");
+		expect(request.prompt).not.toContain("export function readUserId");
+	});
+
 	test("omits attachments when no file path is needed", () => {
 		const request = buildReplyRequest({ thread: sampleReplyThread });
 

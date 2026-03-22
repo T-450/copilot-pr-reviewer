@@ -32,10 +32,12 @@ This phase adds a fully autonomous prototype for conversational PR threads by te
 
   Notes: added `src/reply-prototype.ts` plus the `bun run prototype:reply` entry in `package.json`, using the existing reply-request builder to seed a realistic bot thread, show the trigger comment + transcript context, and print the generated same-thread reply. The command runs non-interactively in either `copilot-sdk` mode (when `COPILOT_GITHUB_TOKEN` is set) or a controlled offline mode for local/demo runs. Added `tests/reply-prototype.test.ts` to cover the attachment-first request, nested response text extraction, and a non-interactive prototype flow. Validation is still deferred in this environment because `bun`, `tsc`, and `biome` are not installed here.
 
-- [ ] Write focused tests for conversational thread parsing and reply request construction:
+- [x] Write focused tests for conversational thread parsing and reply request construction:
   - Add tests for identifying reply candidates, preserving thread order, excluding non-actionable comments, and building the reply prompt/request payload
   - Keep test creation separate from validation runs and reuse the repo's existing Bun test factories and mocking patterns before creating new ones
   - Add at least one regression test proving the prototype path stays non-interactive and produces a reply payload when a qualifying follow-up exists
+
+  Notes: tightened `tests/ado-client.test.ts` with a regression that ignores human-only threads while keeping same-timestamp reply ordering deterministic, and extended `tests/review.test.ts` to assert reply requests remain attachment-first while stripping raw bot markers from the prompt payload. `npx tsc --noEmit` and `npx biome check tests/ado-client.test.ts tests/review.test.ts` passed; Bun test execution remains deferred to the validation task because the `bun` binary is not installed in this environment.
 
 - [ ] Run targeted validation and close the prototype phase with a structured result:
   - Run the relevant Bun test files, typecheck, and the prototype command; fix failures before closing the phase

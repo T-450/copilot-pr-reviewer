@@ -818,6 +818,55 @@ describe("listReplyCandidateThreads", () => {
 
 		expect(thread.latestUserFollowUp).toBeNull();
 	});
+
+	test("ignores non-bot threads and keeps comment order stable on timestamp ties", async () => {
+		fetchSpy.mockResolvedValue(
+			jsonResponse({
+				value: [
+					makeAdoThread({
+						id: 21,
+						threadContext: { filePath: "src/review.ts" },
+						comments: [
+							makeAdoComment({
+								id: 9,
+								content:
+									"<!-- copilot-pr-reviewer-bot -->\n<!-- fingerprint:fp-order -->",
+								publishedDate: "2026-03-22T12:00:00.000Z",
+								author: { id: "bot-1", displayName: "Copilot Reviewer" },
+							}),
+							makeAdoComment({
+								id: 11,
+								parentCommentId: 9,
+								content: "Second same-timestamp follow-up",
+								publishedDate: "2026-03-22T12:01:00.000Z",
+								author: { id: "user-2", displayName: "Ada Reviewer" },
+							}),
+							makeAdoComment({
+								id: 10,
+								parentCommentId: 9,
+								content: "First same-timestamp follow-up",
+								publishedDate: "2026-03-22T12:01:00.000Z",
+								author: { id: "user-1", displayName: "Lin Reviewer" },
+							}),
+						],
+					}),
+					makeAdoThread({
+						id: 22,
+						threadContext: { filePath: "src/ignored.ts" },
+						comments: [makeAdoComment({ content: "Human-only thread" })],
+					}),
+				],
+			}),
+		);
+
+		const result = await listReplyCandidateThreads();
+
+		expect(result).toHaveLength(1);
+		expect(result[0].comments.map((comment) => comment.id)).toEqual([
+			9, 10, 11,
+		]);
+		expect(result[0].latestUserFollowUp?.id).toBe(11);
+	});
 });
 
 describe("createThread", () => {
