@@ -1,6 +1,21 @@
 import type { CustomAgentConfig } from "@github/copilot-sdk";
 
 // ---------------------------------------------------------------------------
+// Shared specialist tool scope
+//
+// All specialist agents are limited to read-only inspection plus the custom
+// emit_finding tool.  Destructive tools (edit_file, write_file, shell, etc.)
+// are excluded at the session level via `excludedTools` and are intentionally
+// absent here as well.
+// ---------------------------------------------------------------------------
+
+export const SPECIALIST_TOOLS: readonly string[] = [
+	"emit_finding",
+	"read_file",
+	"list_files",
+];
+
+// ---------------------------------------------------------------------------
 // Security reviewer — OWASP-focused specialist sub-agent
 // ---------------------------------------------------------------------------
 
@@ -17,10 +32,15 @@ const SECURITY_PROMPT = [
 
 export const securityAgentConfig: CustomAgentConfig = {
 	name: "security-reviewer",
+	displayName: "Security Reviewer",
 	description:
 		"Specialized agent for security-focused code review of HIGH_RISK files",
 	prompt: SECURITY_PROMPT,
-	tools: ["emit_finding", "read_file", "list_files"],
+	tools: [...SPECIALIST_TOOLS],
+	// `infer: true` lets the SDK auto-dispatch to this agent when conversation
+	// context matches its description (e.g. security-relevant file content).
+	// The inference is opaque — we cannot force dispatch programmatically.
+	infer: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -39,9 +59,12 @@ const TEST_PROMPT = [
 
 export const testAgentConfig: CustomAgentConfig = {
 	name: "test-reviewer",
+	displayName: "Test Reviewer",
 	description: "Specialized agent for reviewing test coverage and quality",
 	prompt: TEST_PROMPT,
-	tools: ["emit_finding", "read_file", "list_files"],
+	tools: [...SPECIALIST_TOOLS],
+	// See securityAgentConfig comment — same inference mechanism applies.
+	infer: true,
 };
 
 // ---------------------------------------------------------------------------

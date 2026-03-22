@@ -3,6 +3,7 @@ import {
 	renderSystemPrompt,
 	renderFilePrompt,
 	renderPlanningPrompt,
+	SPECIALIST_TOOLS,
 	reviewAgents,
 	securityAgentConfig,
 	testAgentConfig,
@@ -320,13 +321,45 @@ describe("reviewAgents", () => {
 	});
 });
 
+describe("SPECIALIST_TOOLS", () => {
+	test("contains the minimal read-only tool set", () => {
+		expect(SPECIALIST_TOOLS).toEqual(["emit_finding", "read_file", "list_files"]);
+	});
+
+	test("excludes all destructive operations", () => {
+		for (const banned of [
+			"edit_file",
+			"write_file",
+			"shell",
+			"git_push",
+			"web_fetch",
+		]) {
+			expect(SPECIALIST_TOOLS).not.toContain(banned);
+		}
+	});
+
+	test("is readonly and cannot be mutated", () => {
+		// Spread to verify iterable; original stays intact
+		const copy = [...SPECIALIST_TOOLS];
+		expect(copy).toEqual([...SPECIALIST_TOOLS]);
+	});
+});
+
 describe("securityAgentConfig", () => {
 	test("has the expected name", () => {
 		expect(securityAgentConfig.name).toBe("security-reviewer");
 	});
 
+	test("has a human-readable displayName", () => {
+		expect(securityAgentConfig.displayName).toBe("Security Reviewer");
+	});
+
 	test("description mentions security and HIGH_RISK", () => {
 		expect(securityAgentConfig.description).toContain("security");
+	});
+
+	test("infer is explicitly enabled for SDK auto-dispatch", () => {
+		expect(securityAgentConfig.infer).toBe(true);
 	});
 
 	test("prompt covers OWASP categories", () => {
@@ -344,12 +377,8 @@ describe("securityAgentConfig", () => {
 		expect(securityAgentConfig.prompt).toContain("security");
 	});
 
-	test("tools include emit_finding, read_file, list_files only", () => {
-		expect(securityAgentConfig.tools).toEqual([
-			"emit_finding",
-			"read_file",
-			"list_files",
-		]);
+	test("tools match the shared SPECIALIST_TOOLS scope", () => {
+		expect(securityAgentConfig.tools).toEqual([...SPECIALIST_TOOLS]);
 	});
 
 	test("tools exclude all destructive operations", () => {
@@ -371,8 +400,16 @@ describe("testAgentConfig", () => {
 		expect(testAgentConfig.name).toBe("test-reviewer");
 	});
 
+	test("has a human-readable displayName", () => {
+		expect(testAgentConfig.displayName).toBe("Test Reviewer");
+	});
+
 	test("description mentions test coverage and quality", () => {
 		expect(testAgentConfig.description).toContain("test");
+	});
+
+	test("infer is explicitly enabled for SDK auto-dispatch", () => {
+		expect(testAgentConfig.infer).toBe(true);
 	});
 
 	test("prompt covers test quality concerns", () => {
@@ -388,12 +425,8 @@ describe("testAgentConfig", () => {
 		expect(testAgentConfig.prompt).toContain("testing");
 	});
 
-	test("tools include emit_finding, read_file, list_files only", () => {
-		expect(testAgentConfig.tools).toEqual([
-			"emit_finding",
-			"read_file",
-			"list_files",
-		]);
+	test("tools match the shared SPECIALIST_TOOLS scope", () => {
+		expect(testAgentConfig.tools).toEqual([...SPECIALIST_TOOLS]);
 	});
 
 	test("tools exclude all destructive operations", () => {

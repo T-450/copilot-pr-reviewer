@@ -13,11 +13,12 @@ This phase replaces the current inline sub-agent setup with the nearest verified
   - State the selected replacement strategy, its limits, and how it preserves today’s security-reviewer and test-reviewer behavior
   - **Decision:** Stay on `customAgents` — see `docs/decisions/Scoped-Agent-Migration-Strategy.md`
 
-- [ ] Refactor specialist review configuration to the chosen supported pattern:
+- [x] Refactor specialist review configuration to the chosen supported pattern:
   - Search for and reuse the current security and testing reviewer prompts, allowed-tool scopes, and orchestration logic before rewriting them
   - Move specialist agent definitions into a dedicated module or asset with clear ownership and minimal duplication
   - Ensure each specialist remains scoped to the smallest tool set needed for its job
   - Keep the default review session behavior stable unless the decision record explicitly requires a supported change
+  - **Done:** Extracted shared `SPECIALIST_TOOLS` constant, added `displayName` and explicit `infer: true` to both agents, added `infer` behavior comments, updated tests (209 pass, typecheck clean)
 
 - [ ] Wire specialist selection and invocation into the main review flow:
   - Update session creation and any follow-on calls so the selected agent mechanism is explicit and testable
