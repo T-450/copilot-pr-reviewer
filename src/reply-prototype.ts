@@ -343,9 +343,11 @@ async function runReplyPrototype(): Promise<void> {
 	}
 }
 
-runReplyPrototype().catch((error) => {
-	console.error(
-		`Reply prototype failed: ${error instanceof Error ? error.message : String(error)}`,
-	);
-	process.exit(1);
-});
+if (import.meta.main) {
+	runReplyPrototype().catch((error) => {
+		console.error(
+			`Reply prototype failed: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		process.exit(1);
+	});
+}

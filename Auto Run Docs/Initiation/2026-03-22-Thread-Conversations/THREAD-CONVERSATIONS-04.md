@@ -4,11 +4,12 @@ This phase hardens the conversational thread feature for maintainability, observ
 
 ## Tasks
 
-- [ ] Audit the final implementation surface and remove fragile leftovers:
+- [x] Audit the final implementation surface and remove fragile leftovers:
   - Search for and reuse existing cleanup patterns before introducing cosmetic refactors
   - Verify there are no dead prototype-only branches, duplicate prompt builders, orphaned thread helper types, or stale comments left behind by the earlier phases
   - Update only the minimum naming and inline comments needed to keep the conversational flow understandable for future work
-  - Note (2026-03-22, cs): Reused the shared reply session prompt in `src/reply-prototype.ts`, pointed `src/reply-loop.ts` at the canonical `thread-context` type source, cleaned the stale Azure DevOps suggestion comment, removed orphaned `ReplyCandidateThread` fields (`botAuthorId`, `latestBotReplyAt`, `latestBotCheckpoint`), and dropped the prototype-only `extractAssistantText` re-export. `node_modules/.bin/tsc --noEmit` passes, but `bun` is still unavailable in this environment, so the Bun test run remains blocked and this item stays open for a later validation pass before it can be checked off.
+  - Note (2026-03-22, cs): Reused the shared reply session prompt in `src/reply-prototype.ts`, pointed `src/reply-loop.ts` at the canonical `thread-context` type source, cleaned the stale Azure DevOps suggestion comment, removed orphaned `ReplyCandidateThread` fields (`botAuthorId`, `latestBotReplyAt`, `latestBotCheckpoint`), and dropped the prototype-only `extractAssistantText` re-export.
+  - Note (2026-03-22, cs): Completed the final cleanup audit by removing the remaining prototype-only import side effect in `src/reply-prototype.ts` so test imports no longer auto-run the prototype harness. Verified with a local Bun binary at `Auto Run Docs/Working/bun-linux-x64/bun` plus `./node_modules/.bin/tsc --noEmit`; the targeted thread conversation suites now pass cleanly.
 
 - [ ] Expand regression coverage across the full thread-conversation path:
   - Add or update tests covering live orchestration sequencing, ADO reply posting, thread parsing, prompt rendering, duplicate suppression, graceful failure handling, and multi-turn conversation targeting
