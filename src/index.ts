@@ -1,7 +1,6 @@
 import {
 	CopilotClient,
 	approveAll,
-	type CustomAgentConfig,
 	type SessionEvent,
 } from "@github/copilot-sdk";
 import { loadConfig, meetsThreshold } from "./config.ts";
@@ -24,42 +23,11 @@ import { createHooks } from "./hooks.ts";
 import { configureBundledInstructionDirs } from "./instructions.ts";
 import { clusterFindings } from "./cluster.ts";
 import { CHANGE_TYPE_LABELS, type Finding } from "./types.ts";
+import { reviewAgents } from "./prompts/index.ts";
 
 const REVIEW_TIMEOUT = 120_000;
 const PLANNING_TIMEOUT = 30_000;
 const THREAD_ACTION_DELAY_MS = 500;
-
-const securityAgentConfig: CustomAgentConfig = {
-	name: "security-reviewer",
-	description:
-		"Specialized agent for security-focused code review of HIGH_RISK files",
-	prompt: [
-		"You are a security specialist. Review code for:",
-		"- Authentication/authorization bypasses",
-		"- Injection vulnerabilities (SQL, XSS, command injection)",
-		"- Sensitive data exposure (secrets, PII, tokens)",
-		"- Insecure cryptographic practices",
-		"- SSRF, path traversal, and other OWASP Top 10 issues",
-		"",
-		"Use emit_finding for each issue. Set category to 'security' and severity to 'critical' or 'warning'.",
-	].join("\n"),
-	tools: ["emit_finding", "read_file", "list_files"],
-};
-
-const testAgentConfig: CustomAgentConfig = {
-	name: "test-reviewer",
-	description: "Specialized agent for reviewing test coverage and quality",
-	prompt: [
-		"You are a testing specialist. Review code for:",
-		"- Missing test coverage for new/changed code",
-		"- Untested edge cases and error paths",
-		"- Flaky test patterns (timing, network, random)",
-		"- Test-implementation coupling (testing internals vs behavior)",
-		"",
-		"Use emit_finding for each issue. Set category to 'testing'.",
-	].join("\n"),
-	tools: ["emit_finding", "read_file", "list_files"],
-};
 
 function createStreamingHandler(): (event: SessionEvent) => void {
 	return (event) => {
@@ -155,7 +123,7 @@ async function main(): Promise<void> {
 			enabled: true,
 			bufferExhaustionThreshold: 0.7,
 		},
-		customAgents: [securityAgentConfig, testAgentConfig],
+		customAgents: [...reviewAgents],
 		hooks: createHooks(),
 		systemMessage: {
 			content: buildSystemPrompt(pr, config),

@@ -10,11 +10,12 @@ This phase turns the upgraded prototype into a maintainable foundation by separa
   - Capture which prompt sections belong in code, which belong in reusable templates, and which should become workflow or skill assets
   - Completed: Comprehensive map at `docs/research/copilot-sdk/Prompt-And-Instruction-Composition-Map.md` covering all 7 prompt sources, execution order diagram, interpolation points, classification of each source (stays as asset / template candidate / consolidation candidate), attachment vs prompt-injection audit, and config influence on prompts. All 136 tests pass.
 
-- [ ] Extract prompt templates into explicit, reusable review assets:
+- [x] Extract prompt templates into explicit, reusable review assets:
   - Refactor system, planning, and per-file prompt construction into clearly named template modules or assets without changing the current review contract
   - Preserve the existing finding schema, severity rules, and PR context details
   - Make the quick-pass review mode explicit in prompt selection while leaving room for deeper review modes later
   - Keep all new template paths easy to test and easy to reference from session setup
+  - Completed: Created `src/prompts/` module with four files: `templates.ts` (named template constants + `renderSystemPrompt`, `renderFilePrompt`, `renderPlanningPrompt`), `agents.ts` (security-reviewer and test-reviewer sub-agent configs extracted from index.ts), `review-modes.ts` (`ReviewMode` union type with `resolveReviewMode()`), and `index.ts` barrel export. Refactored `src/review.ts` to delegate to template render functions via thin wrappers preserving the existing API. Refactored `src/index.ts` to import `reviewAgents` from the prompts module. All 136 tests pass, typecheck clean.
 
 - [ ] Align bundled instructions and skills/workflows with the verified SDK surface:
   - Reuse the existing bundled instruction directory logic before adding new loading behavior

@@ -3,12 +3,16 @@ import { defineTool, type Tool } from "@github/copilot-sdk";
 import type { PRMetadata, ChangedFile } from "./ado/client.ts";
 import type { Config } from "./config.ts";
 import {
-	CHANGE_TYPE_LABELS,
 	type Finding,
 	type Severity,
 	type Category,
 	type Confidence,
 } from "./types.ts";
+import {
+	renderSystemPrompt,
+	renderFilePrompt,
+	renderPlanningPrompt,
+} from "./prompts/index.ts";
 
 export const FindingArgsSchema = z.object({
 	filePath: z.string(),
@@ -75,70 +79,16 @@ export function createEmitFindingTool(findings: Finding[]): Tool<FindingArgs> {
 }
 
 export function buildSystemPrompt(pr: PRMetadata, config: Config): string {
-	const sections = [
-		"You are reviewing a pull request and must report issues with the emit_finding tool.",
-		"",
-		"## PR Context",
-		`**Title:** ${pr.title}`,
-	];
-
-	if (pr.description) {
-		sections.push(`**Description:** ${pr.description}`);
-	}
-
-	if (pr.workItemIds.length > 0) {
-		sections.push(
-			`**Work Items:** ${pr.workItemIds.map((id) => `#${id}`).join(", ")}`,
-		);
-	}
-
-	sections.push(
-		"",
-		"## Review Contract",
-		`- Only report findings at severity \`${config.severityThreshold}\` or above`,
-		"- Each finding MUST include: filePath, startLine, endLine, severity, category, title, message, confidence",
-		"- Use categories: correctness, security, reliability, maintainability, testing",
-	);
-
-	return sections.join("\n");
+	return renderSystemPrompt(pr, config);
 }
 
 export function buildFilePrompt(filePath: string, changeType: string): string {
-	return [
-		`Review the following file. Change type: ${changeType}.`,
-		`File: ${filePath}`,
-		"",
-		"Call `emit_finding` for each issue found. If the file is clean, respond with a brief confirmation and do not call `emit_finding`.",
-	].join("\n");
+	return renderFilePrompt(filePath, changeType);
 }
 
 export function buildPlanningPrompt(
 	pr: PRMetadata,
 	files: readonly ChangedFile[],
 ): string {
-	const fileList = files
-		.map((f) => {
-			const label = CHANGE_TYPE_LABELS[f.changeType] ?? "unknown";
-			return `- ${f.path} (${label})`;
-		})
-		.join("\n");
-
-	return [
-		`You are planning a code review for PR: "${pr.title}"`,
-		"",
-		pr.description ? `Description: ${pr.description}` : "",
-		"",
-		"## Changed Files",
-		fileList,
-		"",
-		"## Task",
-		"Analyze the file list and PR description. Identify:",
-		"1. Which files are most likely to contain bugs or security issues",
-		"2. Which files should be reviewed together (shared dependencies)",
-		"3. Suggested review order (highest risk first)",
-		"",
-		"Respond with a brief review plan. Do NOT review the files yet.",
-	]
-		.filter(Boolean)
-		.join("\n");
+	return renderPlanningPrompt(pr, files);
 }
