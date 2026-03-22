@@ -152,11 +152,12 @@ describe("createSessionStartHook", () => {
 });
 
 describe("createHooks", () => {
-	test("returns post tool and lifecycle hooks", () => {
+	test("returns all hooks including pre-tool-use and prompt hooks", () => {
 		const hooks = createHooks();
 
-		expect(hooks.onPreToolUse).toBeUndefined();
+		expect(hooks.onPreToolUse).toBeDefined();
 		expect(hooks.onPostToolUse).toBeDefined();
+		expect(hooks.onUserPromptSubmitted).toBeDefined();
 		expect(hooks.onErrorOccurred).toBeDefined();
 		expect(hooks.onSessionEnd).toBeDefined();
 		expect(hooks.onSessionStart).toBeDefined();
