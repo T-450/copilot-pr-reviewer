@@ -1,13 +1,12 @@
 import { z } from "zod";
-import { defineTool, type Tool, type MessageOptions } from "@github/copilot-sdk";
+import {
+	defineTool,
+	type Tool,
+	type MessageOptions,
+} from "@github/copilot-sdk";
 import type { PRMetadata, ChangedFile } from "./ado/client.ts";
 import type { Config } from "./config.ts";
-import {
-	type Finding,
-	type Severity,
-	type Category,
-	type Confidence,
-} from "./types.ts";
+import type { Finding, Severity, Category, Confidence } from "./types.ts";
 import {
 	renderSystemPrompt,
 	renderFilePrompt,

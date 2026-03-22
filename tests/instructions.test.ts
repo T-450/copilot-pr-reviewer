@@ -107,10 +107,9 @@ describe("configureBundledInstructionDirs — regression", () => {
 	});
 
 	test("bundled root appears first even when env var has existing entries", () => {
-		process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS = [
-			"/first",
-			"/second",
-		].join(delimiter);
+		process.env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS = ["/first", "/second"].join(
+			delimiter,
+		);
 
 		const dirs = configureBundledInstructionDirs();
 		const bundled = getBundledInstructionRoot();

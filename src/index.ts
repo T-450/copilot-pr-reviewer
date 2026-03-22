@@ -1,8 +1,4 @@
-import {
-	CopilotClient,
-	approveAll,
-	type SessionEvent,
-} from "@github/copilot-sdk";
+import { CopilotClient, type SessionEvent } from "@github/copilot-sdk";
 import { loadConfig, meetsThreshold } from "./config.ts";
 import {
 	fetchPRMetadata,
@@ -14,19 +10,14 @@ import {
 	collectFeedback,
 } from "./ado/client.ts";
 import {
-	buildSystemPrompt,
 	buildPlanningPrompt,
 	buildFileReviewRequest,
 	createEmitFindingTool,
 } from "./review.ts";
-import { createHooks } from "./hooks.ts";
-import {
-	configureBundledInstructionDirs,
-	buildSessionInstructionConfig,
-} from "./instructions.ts";
+import { configureBundledInstructionDirs } from "./instructions.ts";
 import { clusterFindings } from "./cluster.ts";
 import { CHANGE_TYPE_LABELS, type Finding } from "./types.ts";
-import { reviewAgents } from "./prompts/index.ts";
+import { buildSessionConfig } from "./session.ts";
 
 const REVIEW_TIMEOUT = 120_000;
 const PLANNING_TIMEOUT = 30_000;
@@ -100,43 +91,27 @@ async function main(): Promise<void> {
 	);
 
 	configureBundledInstructionDirs();
-	const instructionConfig = buildSessionInstructionConfig();
 
-	const client = new CopilotClient({
-		cwd: process.env.REPO_ROOT ?? process.cwd(),
-	});
+	const repoRoot = process.env.REPO_ROOT ?? process.cwd();
+
+	const client = new CopilotClient({ cwd: repoRoot });
 
 	const findings: Finding[] = [];
 	const emitFinding = createEmitFindingTool(findings);
 
-	const session = await client.createSession({
-		sessionId: `review-${process.env.ADO_REPO_ID}-${process.env.ADO_PR_ID}-${iterationDiff.currentIteration}`,
-		model: process.env.COPILOT_MODEL ?? "gpt-4.1",
-		reasoningEffort: config.reasoningEffort,
-		streaming: true,
+	const sessionConfig = buildSessionConfig({
+		repoId: process.env.ADO_REPO_ID ?? "",
+		prId: process.env.ADO_PR_ID ?? "",
+		iteration: iterationDiff.currentIteration,
+		pr,
+		config,
 		tools: [emitFinding],
-		excludedTools: [
-			"edit_file",
-			"write_file",
-			"shell",
-			"git_push",
-			"web_fetch",
-		],
-		infiniteSessions: {
-			backgroundCompactionThreshold: 0.85,
-			enabled: true,
-			bufferExhaustionThreshold: 0.7,
-		},
-		customAgents: [...reviewAgents],
-		hooks: createHooks(),
-		systemMessage: {
-			content: buildSystemPrompt(pr, config),
-			mode: "append",
-		},
-		...instructionConfig,
-		onPermissionRequest: approveAll,
+		repoRoot,
+	});
+
+	const session = await client.createSession({
+		...sessionConfig,
 		onEvent: createStreamingHandler(),
-		workingDirectory: process.env.REPO_ROOT ?? process.cwd(),
 	});
 
 	try {
@@ -148,7 +123,11 @@ async function main(): Promise<void> {
 			);
 		}
 
-		const repoRoot = process.env.REPO_ROOT ?? process.cwd();
+		// Per-file review loop.  Each sendAndWait call sends a prompt + file
+		// attachment.  The SDK's agent inference may dispatch to a specialist
+		// (security-reviewer, test-reviewer) based on the file content and the
+		// agents' descriptions.  Files that don't trigger a specialist are
+		// reviewed by the main session agent.
 		for (const file of filesToReview) {
 			const changeLabel = CHANGE_TYPE_LABELS[file.changeType] ?? "unknown";
 			console.log(`  Reviewing ${file.path} (${changeLabel})...`);

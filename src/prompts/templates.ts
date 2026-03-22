@@ -20,7 +20,12 @@ export function renderSystemPrompt(
 	config: Config,
 	_mode: ReviewMode = "quick-pass",
 ): string {
-	const sections = [SYSTEM_PREAMBLE, "", "## PR Context", `**Title:** ${pr.title}`];
+	const sections = [
+		SYSTEM_PREAMBLE,
+		"",
+		"## PR Context",
+		`**Title:** ${pr.title}`,
+	];
 
 	if (pr.description) {
 		sections.push(`**Description:** ${pr.description}`);

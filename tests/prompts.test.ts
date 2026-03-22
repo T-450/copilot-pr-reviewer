@@ -262,11 +262,7 @@ describe("renderPlanningPrompt", () => {
 
 	test("mode parameter defaults to quick-pass without affecting output", () => {
 		const withDefault = renderPlanningPrompt(samplePR, files);
-		const withExplicit = renderPlanningPrompt(
-			samplePR,
-			files,
-			"quick-pass",
-		);
+		const withExplicit = renderPlanningPrompt(samplePR, files, "quick-pass");
 		expect(withDefault).toBe(withExplicit);
 	});
 });
@@ -323,7 +319,11 @@ describe("reviewAgents", () => {
 
 describe("SPECIALIST_TOOLS", () => {
 	test("contains the minimal read-only tool set", () => {
-		expect(SPECIALIST_TOOLS).toEqual(["emit_finding", "read_file", "list_files"]);
+		expect(SPECIALIST_TOOLS).toEqual([
+			"emit_finding",
+			"read_file",
+			"list_files",
+		]);
 	});
 
 	test("excludes all destructive operations", () => {

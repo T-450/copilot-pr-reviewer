@@ -229,9 +229,9 @@ describe("buildFileReviewRequest", () => {
 		);
 		const attachment = request.attachments![0];
 
-		expect(
-			attachment.type === "file" && attachment.path.startsWith("/"),
-		).toBe(true);
+		expect(attachment.type === "file" && attachment.path.startsWith("/")).toBe(
+			true,
+		);
 	});
 
 	test("prompt does not embed file content (attachment-first invariant)", () => {
