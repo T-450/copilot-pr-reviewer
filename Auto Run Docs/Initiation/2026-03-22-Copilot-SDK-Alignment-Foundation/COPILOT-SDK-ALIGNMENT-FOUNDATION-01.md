@@ -32,11 +32,12 @@ This phase upgrades the project to `@github/copilot-sdk` `0.2.0`, verifies the r
   - Add streaming event handling or logging so a user can see real-time review progress during execution
   - Completed: `defineTool()` migrated with `skipPermission: true`, `reasoningEffort` config field (default `"low"`), `onPreToolUse` denies destructive tools, `onUserPromptSubmitted` guards empty prompts, streaming via `onEvent` handler shows dots/errors. 89 tests pass, typecheck clean.
 
-- [ ] Deliver a runnable prototype that proves the upgraded foundation works end to end without user input:
+- [x] Deliver a runnable prototype that proves the upgraded foundation works end to end without user input:
   - Reuse existing E2E and SDK integration patterns before creating new fixtures or harnesses
   - Add or update one executable prototype path that starts the upgraded client, performs planning when appropriate, reviews attached files, and records findings
   - Ensure the prototype runs non-interactively through an existing Bun command or a narrowly scoped new command
   - Make the output visibly useful: show per-file review progress, streaming updates, and a final findings summary
+  - Completed: `src/prototype.ts` created as standalone script, `bun run prototype` command added. Scaffolds temp dir with 3 sample files (hardcoded secrets, missing null checks, SQL injection), creates session with all 0.2.0 features (defineTool, reasoningEffort, hooks, streaming, attachments), runs planning → per-file review → clustering → formatted summary. Typecheck clean, 89 tests pass.
 
 - [ ] Write focused tests for the upgraded tool and session wiring:
   - Cover the `defineTool()` migration, attachment-based review requests, reasoning mode selection, and the newly wired hooks
