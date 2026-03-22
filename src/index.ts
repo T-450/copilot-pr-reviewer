@@ -2,6 +2,7 @@ import {
 	CopilotClient,
 	approveAll,
 	type CustomAgentConfig,
+	type SessionEvent,
 } from "@github/copilot-sdk";
 import { loadConfig, meetsThreshold } from "./config.ts";
 import {
@@ -59,6 +60,26 @@ const testAgentConfig: CustomAgentConfig = {
 	].join("\n"),
 	tools: ["emit_finding", "read_file", "list_files"],
 };
+
+function createStreamingHandler(): (event: SessionEvent) => void {
+	return (event) => {
+		switch (event.type) {
+			case "assistant.message_delta":
+				process.stdout.write(".");
+				break;
+			case "assistant.message":
+				process.stdout.write("\n");
+				break;
+			case "session.error":
+				console.error(
+					`  [stream error] ${(event as { data: { message: string } }).data.message}`,
+				);
+				break;
+			case "session.idle":
+				break;
+		}
+	};
+}
 
 async function main(): Promise<void> {
 	const configPath = process.env.CONFIG_PATH ?? ".prreviewer.yml";
@@ -119,6 +140,8 @@ async function main(): Promise<void> {
 	const session = await client.createSession({
 		sessionId: `review-${process.env.ADO_REPO_ID}-${process.env.ADO_PR_ID}-${iterationDiff.currentIteration}`,
 		model: process.env.COPILOT_MODEL ?? "gpt-4.1",
+		reasoningEffort: config.reasoningEffort,
+		streaming: true,
 		tools: [emitFinding],
 		excludedTools: [
 			"edit_file",
@@ -139,6 +162,7 @@ async function main(): Promise<void> {
 			mode: "append",
 		},
 		onPermissionRequest: approveAll,
+		onEvent: createStreamingHandler(),
 		workingDirectory: process.env.REPO_ROOT ?? process.cwd(),
 	});
 

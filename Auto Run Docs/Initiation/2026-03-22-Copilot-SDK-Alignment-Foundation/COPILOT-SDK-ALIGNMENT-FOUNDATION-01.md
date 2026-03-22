@@ -24,12 +24,13 @@ This phase upgrades the project to `@github/copilot-sdk` `0.2.0`, verifies the r
   - Record migration constraints, non-goals, and compatibility decisions in a structured markdown decision note with YAML front matter and wiki-links to the research docs
   - Completed: SDK upgraded to 0.2.0, typecheck and all 83 tests pass with zero code changes, decision note at `docs/research/copilot-sdk/Copilot-SDK-0.2.0-Migration-Decisions.md`
 
-- [ ] Refactor the review session foundation to verified `0.2.0` APIs and keep the current review flow intact:
+- [x] Refactor the review session foundation to verified `0.2.0` APIs and keep the current review flow intact:
   - Replace the manual `emit_finding` tool definition with `defineTool()` and the existing Zod schema from `src/review.ts`
   - Keep whole-file native attachments as the default review input path and remove prompt-injected file content where it is still being used in executable review paths
   - Add `reasoningEffort` support for a quick-pass default that matches current behavior as closely as possible, with an easy path for deeper review later
   - Add `onPreToolUse` and `onUserPromptSubmitted` hooks in a behavior-preserving way and keep the existing lifecycle hooks working
   - Add streaming event handling or logging so a user can see real-time review progress during execution
+  - Completed: `defineTool()` migrated with `skipPermission: true`, `reasoningEffort` config field (default `"low"`), `onPreToolUse` denies destructive tools, `onUserPromptSubmitted` guards empty prompts, streaming via `onEvent` handler shows dots/errors. 89 tests pass, typecheck clean.
 
 - [ ] Deliver a runnable prototype that proves the upgraded foundation works end to end without user input:
   - Reuse existing E2E and SDK integration patterns before creating new fixtures or harnesses

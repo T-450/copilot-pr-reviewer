@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+	createPreToolUseHook,
 	createPostToolUseHook,
+	createUserPromptSubmittedHook,
 	createErrorOccurredHook,
 	createSessionEndHook,
 	createSessionStartHook,
@@ -8,6 +10,53 @@ import {
 } from "../src/hooks.ts";
 
 const inv = { sessionId: "test-session" };
+
+describe("createPreToolUseHook", () => {
+	test("denies destructive tools", () => {
+		const hook = createPreToolUseHook();
+		for (const toolName of [
+			"edit_file",
+			"write_file",
+			"shell",
+			"git_push",
+			"web_fetch",
+		]) {
+			const result = hook(
+				{ timestamp: Date.now(), cwd: "/tmp", toolName, toolArgs: {} },
+				inv,
+			);
+			expect(result?.permissionDecision).toBe("deny");
+		}
+	});
+
+	test("allows safe tools", () => {
+		const hook = createPreToolUseHook();
+		const result = hook(
+			{
+				timestamp: Date.now(),
+				cwd: "/tmp",
+				toolName: "read_file",
+				toolArgs: {},
+			},
+			inv,
+		);
+		expect(result).toBeUndefined();
+	});
+
+	test("allows emit_finding tool", () => {
+		const hook = createPreToolUseHook();
+		const result = hook(
+			{
+				timestamp: Date.now(),
+				cwd: "/tmp",
+				toolName: "emit_finding",
+				toolArgs: {},
+			},
+			inv,
+		);
+		expect(result).toBeUndefined();
+	});
+});
 
 describe("createPostToolUseHook", () => {
 	test("detects test companion files", async () => {
@@ -64,6 +113,39 @@ describe("createPostToolUseHook", () => {
 			inv,
 		);
 
+		expect(result).toBeUndefined();
+	});
+});
+
+describe("createUserPromptSubmittedHook", () => {
+	test("suppresses empty prompts", () => {
+		const hook = createUserPromptSubmittedHook();
+		const result = hook(
+			{ timestamp: Date.now(), cwd: "/tmp", prompt: "" },
+			inv,
+		);
+		expect(result?.suppressOutput).toBe(true);
+	});
+
+	test("suppresses whitespace-only prompts", () => {
+		const hook = createUserPromptSubmittedHook();
+		const result = hook(
+			{ timestamp: Date.now(), cwd: "/tmp", prompt: "   " },
+			inv,
+		);
+		expect(result?.suppressOutput).toBe(true);
+	});
+
+	test("passes through valid prompts", () => {
+		const hook = createUserPromptSubmittedHook();
+		const result = hook(
+			{
+				timestamp: Date.now(),
+				cwd: "/tmp",
+				prompt: "Review this file",
+			},
+			inv,
+		);
 		expect(result).toBeUndefined();
 	});
 });
@@ -152,11 +234,12 @@ describe("createSessionStartHook", () => {
 });
 
 describe("createHooks", () => {
-	test("returns post tool and lifecycle hooks", () => {
+	test("returns all hooks including new ones", () => {
 		const hooks = createHooks();
 
-		expect(hooks.onPreToolUse).toBeUndefined();
+		expect(hooks.onPreToolUse).toBeDefined();
 		expect(hooks.onPostToolUse).toBeDefined();
+		expect(hooks.onUserPromptSubmitted).toBeDefined();
 		expect(hooks.onErrorOccurred).toBeDefined();
 		expect(hooks.onSessionEnd).toBeDefined();
 		expect(hooks.onSessionStart).toBeDefined();

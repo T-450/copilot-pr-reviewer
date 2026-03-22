@@ -2,9 +2,12 @@ import type { ToolResultObject } from "@github/copilot-sdk";
 
 type Invocation = { sessionId: string };
 
-type PreToolUseInput = {
+type BaseHookInput = {
 	timestamp: number;
 	cwd: string;
+};
+
+type PreToolUseInput = BaseHookInput & {
 	toolName: string;
 	toolArgs: unknown;
 };
@@ -15,9 +18,7 @@ type PreToolUseOutput = {
 	additionalContext?: string;
 	suppressOutput?: boolean;
 };
-type PostToolUseInput = {
-	timestamp: number;
-	cwd: string;
+type PostToolUseInput = BaseHookInput & {
 	toolName: string;
 	toolArgs: unknown;
 	toolResult: ToolResultObject;
@@ -27,9 +28,15 @@ type PostToolUseOutput = {
 	additionalContext?: string;
 	suppressOutput?: boolean;
 };
-type ErrorOccurredInput = {
-	timestamp: number;
-	cwd: string;
+type UserPromptSubmittedInput = BaseHookInput & {
+	prompt: string;
+};
+type UserPromptSubmittedOutput = {
+	modifiedPrompt?: string;
+	additionalContext?: string;
+	suppressOutput?: boolean;
+};
+type ErrorOccurredInput = BaseHookInput & {
 	error: string;
 	errorContext: "model_call" | "tool_execution" | "system" | "user_input";
 	recoverable: boolean;
@@ -40,9 +47,7 @@ type ErrorOccurredOutput = {
 	retryCount?: number;
 	userNotification?: string;
 };
-type SessionEndInput = {
-	timestamp: number;
-	cwd: string;
+type SessionEndInput = BaseHookInput & {
 	reason: "complete" | "error" | "abort" | "timeout" | "user_exit";
 	finalMessage?: string;
 	error?: string;
@@ -52,9 +57,7 @@ type SessionEndOutput = {
 	cleanupActions?: string[];
 	sessionSummary?: string;
 };
-type SessionStartInput = {
-	timestamp: number;
-	cwd: string;
+type SessionStartInput = BaseHookInput & {
 	source: "startup" | "resume" | "new";
 	initialPrompt?: string;
 };
@@ -67,26 +70,30 @@ export type SessionHooks = {
 	onPreToolUse?: (
 		input: PreToolUseInput,
 		inv: Invocation,
-	) => Promise<PreToolUseOutput | undefined> | PreToolUseOutput | undefined;
+	) => Promise<PreToolUseOutput | void> | PreToolUseOutput | void;
 	onPostToolUse?: (
 		input: PostToolUseInput,
 		inv: Invocation,
-	) => Promise<PostToolUseOutput | undefined> | PostToolUseOutput | undefined;
+	) => Promise<PostToolUseOutput | void> | PostToolUseOutput | void;
+	onUserPromptSubmitted?: (
+		input: UserPromptSubmittedInput,
+		inv: Invocation,
+	) => Promise<UserPromptSubmittedOutput | void> | UserPromptSubmittedOutput | void;
 	onErrorOccurred?: (
 		input: ErrorOccurredInput,
 		inv: Invocation,
 	) =>
-		| Promise<ErrorOccurredOutput | undefined>
+		| Promise<ErrorOccurredOutput | void>
 		| ErrorOccurredOutput
-		| undefined;
+		| void;
 	onSessionEnd?: (
 		input: SessionEndInput,
 		inv: Invocation,
-	) => Promise<SessionEndOutput | undefined> | SessionEndOutput | undefined;
+	) => Promise<SessionEndOutput | void> | SessionEndOutput | void;
 	onSessionStart?: (
 		input: SessionStartInput,
 		inv: Invocation,
-	) => Promise<SessionStartOutput | undefined> | SessionStartOutput | undefined;
+	) => Promise<SessionStartOutput | void> | SessionStartOutput | void;
 };
 
 const SOURCE_EXTS = new Set([
@@ -108,6 +115,29 @@ const SOURCE_EXTS = new Set([
 	".h",
 ]);
 
+const DENIED_TOOLS = new Set([
+	"edit_file",
+	"write_file",
+	"shell",
+	"git_push",
+	"web_fetch",
+]);
+
+export function createPreToolUseHook(): (
+	input: PreToolUseInput,
+	inv: Invocation,
+) => PreToolUseOutput | undefined {
+	return (input, _invocation) => {
+		if (DENIED_TOOLS.has(input.toolName)) {
+			return {
+				permissionDecision: "deny" as const,
+				permissionDecisionReason: `Tool "${input.toolName}" is not allowed in automated review sessions`,
+			};
+		}
+		return undefined;
+	};
+}
+
 export function createPostToolUseHook(): (
 	input: PostToolUseInput,
 	inv: Invocation,
@@ -128,6 +158,18 @@ export function createPostToolUseHook(): (
 		return {
 			additionalContext: `💡 Check if a test companion exists at ${baseName}.test${ext} — if so, verify test coverage for changes in this file.`,
 		};
+	};
+}
+
+export function createUserPromptSubmittedHook(): (
+	input: UserPromptSubmittedInput,
+	inv: Invocation,
+) => UserPromptSubmittedOutput | undefined {
+	return (input, _invocation) => {
+		if (!input.prompt || input.prompt.trim().length === 0) {
+			return { suppressOutput: true };
+		}
+		return undefined;
 	};
 }
 
@@ -182,7 +224,9 @@ export function createSessionStartHook(): (
 
 export function createHooks(): SessionHooks {
 	return {
+		onPreToolUse: createPreToolUseHook(),
 		onPostToolUse: createPostToolUseHook(),
+		onUserPromptSubmitted: createUserPromptSubmittedHook(),
 		onErrorOccurred: createErrorOccurredHook(),
 		onSessionEnd: createSessionEndHook(),
 		onSessionStart: createSessionStartHook(),

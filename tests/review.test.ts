@@ -16,6 +16,7 @@ const defaultConfig: Config = {
 	planning: true,
 	clustering: true,
 	clusterThreshold: 3,
+	reasoningEffort: "low",
 };
 
 const samplePR: PRMetadata = {
@@ -161,7 +162,8 @@ describe("createEmitFindingTool", () => {
 				title: "Test",
 				message: "Test message",
 				confidence: "high",
-			},
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			} as any,
 			{
 				sessionId: "test",
 				toolCallId: "tc1",

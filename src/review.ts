@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Tool, ToolInvocation } from "@github/copilot-sdk";
+import { defineTool, type Tool } from "@github/copilot-sdk";
 import type { PRMetadata, ChangedFile } from "./ado/client.ts";
 import type { Config } from "./config.ts";
 import {
@@ -10,7 +10,7 @@ import {
 	type Confidence,
 } from "./types.ts";
 
-const FindingArgsSchema = z.object({
+export const FindingArgsSchema = z.object({
 	filePath: z.string(),
 	startLine: z.number().int().positive(),
 	endLine: z.number().int().positive(),
@@ -39,31 +39,31 @@ function computeFingerprint(args: FindingArgs): string {
 	return hasher.digest("hex").slice(0, 16);
 }
 
-export function createEmitFindingTool(findings: Finding[]): Tool {
-	return {
-		name: "emit_finding",
+export function createEmitFindingTool(findings: Finding[]): Tool<FindingArgs> {
+	return defineTool("emit_finding", {
 		description:
 			"Report a code review finding. Call once per distinct issue found. Include file path, line range, severity, category, and a clear explanation.",
 		parameters: FindingArgsSchema,
-		handler: async (rawArgs: unknown, _invocation: ToolInvocation) => {
-			const parsed = FindingArgsSchema.safeParse(rawArgs);
+		skipPermission: true,
+		handler: async (args) => {
+			const parsed = FindingArgsSchema.safeParse(args);
 			if (!parsed.success) {
 				return `Invalid finding: ${parsed.error.issues.map((i) => i.message).join(", ")}`;
 			}
 
-			const args = parsed.data;
-			const fingerprint = computeFingerprint(args);
+			const validated = parsed.data;
+			const fingerprint = computeFingerprint(validated);
 
 			const finding: Finding = {
-				filePath: args.filePath,
-				startLine: args.startLine,
-				endLine: args.endLine,
-				severity: args.severity as Severity,
-				category: args.category as Category,
-				title: args.title,
-				message: args.message,
-				suggestion: args.suggestion,
-				confidence: args.confidence as Confidence,
+				filePath: validated.filePath,
+				startLine: validated.startLine,
+				endLine: validated.endLine,
+				severity: validated.severity as Severity,
+				category: validated.category as Category,
+				title: validated.title,
+				message: validated.message,
+				suggestion: validated.suggestion,
+				confidence: validated.confidence as Confidence,
 				fingerprint,
 			};
 
@@ -71,7 +71,7 @@ export function createEmitFindingTool(findings: Finding[]): Tool {
 
 			return `Finding recorded: [${finding.severity}] ${finding.title} (${finding.filePath}:${finding.startLine})`;
 		},
-	};
+	});
 }
 
 export function buildSystemPrompt(pr: PRMetadata, config: Config): string {
